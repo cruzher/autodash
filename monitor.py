@@ -78,6 +78,29 @@ if IS_LINUX:
         logging.warning("wmctrl not found. Install: sudo apt install wmctrl")
 
 
+# ---- DISPLAY SLEEP PREVENTION -------------------------------------------
+
+def disable_display_sleep():
+    if IS_LINUX and shutil.which("xset"):
+        for args in (
+            ["xset", "s", "off"],       # disable screensaver
+            ["xset", "-dpms"],          # disable DPMS power management
+            ["xset", "s", "noblank"],   # disable screen blanking
+        ):
+            r = run_cmd(args)
+            if r.returncode != 0:
+                logging.warning("xset command failed: %s", " ".join(args))
+        logging.info("Display sleep disabled via xset.")
+    elif platform.system() == "Windows":
+        import ctypes
+        ES_CONTINUOUS       = 0x80000000
+        ES_DISPLAY_REQUIRED = 0x00000002
+        ctypes.windll.kernel32.SetThreadExecutionState(
+            ES_CONTINUOUS | ES_DISPLAY_REQUIRED
+        )
+        logging.info("Display sleep disabled via SetThreadExecutionState.")
+
+
 # ---- HELPERS ------------------------------------------------------------
 
 def is_closed_error(exc):
@@ -578,6 +601,7 @@ class SiteMonitor:
 # ---- ENTRY POINT --------------------------------------------------------
 
 async def main():
+    disable_display_sleep()
     profile_dirs = [
         Path(tempfile.mkdtemp(prefix=f"pw_profile_{i}_"))
         for i in range(len(SITES))
