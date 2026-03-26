@@ -129,6 +129,24 @@ For fullscreen / kiosk mode set `fullscreen=True` in the site config; window pos
 
 ---
 
+## Running on boot (Raspberry Pi)
+
+To start autodash automatically when the desktop loads, add an entry to the LXDE autostart file:
+
+```
+/home/<username>/.config/lxsession/LXDE-pi/autostart
+```
+
+Add this line at the end of the file (create the file if it does not exist):
+
+```
+@lxterminal -e /usr/bin/bash /home/<username>/autodash/start.sh
+```
+
+Replace the path with the actual location of `start.sh` on your system.
+
+---
+
 ## File overview
 
 | File | Purpose |
