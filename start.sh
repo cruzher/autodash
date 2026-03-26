@@ -8,6 +8,8 @@ fi
 # From here on we are running under bash
 set -euo pipefail
 
+cd "$(dirname "$(realpath "$0")")"
+
 VENV_DIR=".venv"
 REQUIREMENTS="requirements.txt"
 
