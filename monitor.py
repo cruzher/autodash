@@ -261,6 +261,7 @@ class SiteMonitor:
         self._window_id   = None
         self._seconds_since_pos_check = 0
         self._showing_offline = False
+        self._stable_geom = None   # actual geometry as reported by xdotool after positioning
         self.log          = logging.getLogger(cfg.name)
 
     def _write_profile_prefs(self):
@@ -283,6 +284,7 @@ class SiteMonitor:
             self.context   = None
             self.page      = None
             self._window_id = None
+            self._stable_geom = None
 
         self._write_profile_prefs()
 
@@ -318,6 +320,8 @@ class SiteMonitor:
             except Exception:
                 title = "chromium"
             self._window_id = find_window_id(title)
+            if self._window_id:
+                self._stable_geom = get_window_geometry(self._window_id)
 
     def _on_context_closed(self, *_):
         if not self._closed:
@@ -354,22 +358,29 @@ class SiteMonitor:
         geom = get_window_geometry(self._window_id)
         if geom is None:
             self._window_id = None
+            self._stable_geom = None
             return
+        # Capture the stable geometry the first time we see the window
+        if self._stable_geom is None:
+            self._stable_geom = geom
         x, y, w, h = geom
-        dx = abs(x - self.cfg.window_x)
-        dy = abs(y - self.cfg.window_y)
-        dw = abs(w - self.cfg.window_width)
-        dh = abs(h - self.cfg.window_height)
+        ex, ey, ew, eh = self._stable_geom
+        dx = abs(x - ex)
+        dy = abs(y - ey)
+        dw = abs(w - ew)
+        dh = abs(h - eh)
         if max(dx, dy, dw, dh) > POSITION_TOLERANCE_PX:
             self.log.warning(
                 "Window drifted to (%d,%d) %dx%d - expected (%d,%d) %dx%d - correcting ...",
-                x, y, w, h,
-                self.cfg.window_x, self.cfg.window_y,
-                self.cfg.window_width, self.cfg.window_height,
+                x, y, w, h, ex, ey, ew, eh,
             )
             force_window_geometry(self.cfg, self._window_id, self.log)
             await asyncio.sleep(0.3)
             await fit_viewport_to_window(self.page)
+            # Record the new settled position as the stable reference
+            settled = get_window_geometry(self._window_id)
+            if settled:
+                self._stable_geom = settled
 
     async def _show_offline_page(self):
         if self._showing_offline:
