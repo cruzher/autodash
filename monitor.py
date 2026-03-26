@@ -32,6 +32,32 @@ RECONNECT_DELAY_SECONDS   = 5
 POSITION_CHECK_SECONDS    = 10
 POSITION_TOLERANCE_PX     = 5
 
+# ---- CONNECTIVITY -------------------------------------------------------
+
+INTERNET_CHECK_HOST    = "8.8.8.8"
+INTERNET_CHECK_PORT    = 53
+INTERNET_CHECK_TIMEOUT = 3
+
+_OFFLINE_HTML_PATH = Path(__file__).parent / "offline.html"
+_OFFLINE_URL = _OFFLINE_HTML_PATH.as_uri()
+
+
+async def check_internet() -> bool:
+    """Return True if a TCP connection to the check host succeeds."""
+    try:
+        _, writer = await asyncio.wait_for(
+            asyncio.open_connection(INTERNET_CHECK_HOST, INTERNET_CHECK_PORT),
+            timeout=INTERNET_CHECK_TIMEOUT,
+        )
+        writer.close()
+        try:
+            await writer.wait_closed()
+        except Exception:
+            pass
+        return True
+    except Exception:
+        return False
+
 # ---- LOGGING ------------------------------------------------------------
 
 logging.basicConfig(
@@ -231,6 +257,7 @@ class SiteMonitor:
         self._closed      = False
         self._window_id   = None
         self._seconds_since_pos_check = 0
+        self._showing_offline = False
         self.log          = logging.getLogger(cfg.name)
 
     async def _launch_context(self):
@@ -327,9 +354,28 @@ class SiteMonitor:
             await asyncio.sleep(0.3)
             await fit_viewport_to_window(self.page)
 
+    async def _show_offline_page(self):
+        if self._showing_offline:
+            return
+        self.log.warning("Internet unavailable - showing offline page.")
+        self._showing_offline = True
+        try:
+            await self.page.goto(_OFFLINE_URL, wait_until="load", timeout=10_000)
+        except Exception as exc:
+            if not is_closed_error(exc):
+                self.log.debug("Offline page navigation (non-fatal): %s", exc)
+
+    async def _restore_from_offline(self):
+        self.log.info("Internet restored - resuming.")
+        self._showing_offline = False
+        await self.navigate_and_login()
+
     async def start(self):
         await self._launch_context()
-        await self.navigate_and_login()
+        if not await check_internet():
+            await self._show_offline_page()
+        else:
+            await self.navigate_and_login()
 
     async def navigate_and_login(self):
         self.log.info("Navigating to %s", self.cfg.url)
@@ -449,6 +495,17 @@ class SiteMonitor:
                     seconds_since_refresh         = 0
                     self._seconds_since_pos_check = 0
                     continue
+
+                online = await check_internet()
+                if not online:
+                    await self._show_offline_page()
+                    continue
+                if self._showing_offline:
+                    await self._restore_from_offline()
+                    seconds_since_refresh         = 0
+                    self._seconds_since_pos_check = 0
+                    continue
+
                 if self._seconds_since_pos_check >= POSITION_CHECK_SECONDS:
                     await self._check_window_position()
                     self._seconds_since_pos_check = 0
