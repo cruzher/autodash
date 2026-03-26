@@ -1,0 +1,12 @@
+# Virtual environment
+.venv/
+
+# Site configuration (contains credentials)
+sites.py
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Playwright browser binaries
+playwright/
