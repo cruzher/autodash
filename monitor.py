@@ -282,6 +282,7 @@ class SiteMonitor:
             user_data_dir       = str(self.profile_dir),
             headless            = False,
             args                = [f"--app={self.cfg.url}"] + build_args(self.cfg),
+            ignore_default_args = ["--enable-automation"],
             no_viewport         = True,
             ignore_https_errors = True,
             env                 = launch_env,
