@@ -3,6 +3,7 @@ monitor.py - Multi-Site Auto-Login Monitor using Playwright (Chromium)
 """
 
 import asyncio
+import json
 import logging
 import os
 import platform
@@ -111,6 +112,7 @@ def run_cmd(cmd, timeout=5):
 def build_args(cfg):
     args = [
         "--disable-infobars",
+        "--test-type",
         "--no-default-browser-check",
         "--no-first-run",
         "--disable-extensions",
@@ -261,6 +263,17 @@ class SiteMonitor:
         self._showing_offline = False
         self.log          = logging.getLogger(cfg.name)
 
+    def _write_profile_prefs(self):
+        """Disable password manager before Chromium reads the profile."""
+        prefs_dir = self.profile_dir / "Default"
+        prefs_dir.mkdir(parents=True, exist_ok=True)
+        prefs_file = prefs_dir / "Preferences"
+        prefs = {
+            "credentials_enable_service": False,
+            "profile": {"password_manager_enabled": False},
+        }
+        prefs_file.write_text(json.dumps(prefs))
+
     async def _launch_context(self):
         if self.context:
             try:
@@ -270,6 +283,8 @@ class SiteMonitor:
             self.context   = None
             self.page      = None
             self._window_id = None
+
+        self._write_profile_prefs()
 
         mode = "fullscreen" if self.cfg.fullscreen else (
             f"{self.cfg.window_width}x{self.cfg.window_height} "
