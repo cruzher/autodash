@@ -111,6 +111,7 @@ def run_cmd(cmd, timeout=5):
 def build_args(cfg):
     args = [
         "--disable-infobars",
+        "--disable-blink-features=AutomationControlled",
         "--no-default-browser-check",
         "--no-first-run",
         "--disable-extensions",
@@ -282,7 +283,6 @@ class SiteMonitor:
             user_data_dir       = str(self.profile_dir),
             headless            = False,
             args                = [f"--app={self.cfg.url}"] + build_args(self.cfg),
-            ignore_default_args = ["--enable-automation"],
             no_viewport         = True,
             ignore_https_errors = True,
             env                 = launch_env,
