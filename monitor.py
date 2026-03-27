@@ -807,10 +807,10 @@ async def schedule_coordinator(monitors, pw):
 
     async def _close_notice():
         nonlocal notice_context
+        disable_display_sleep()
         if notice_context is None:
             return
         log.info("A monitor became active — closing notice window.")
-        disable_display_sleep()
         try:
             await notice_context.close()
         except Exception:
@@ -871,6 +871,7 @@ async def schedule_coordinator(monitors, pw):
 # ---- ENTRY POINT --------------------------------------------------------
 
 async def main():
+    disable_display_sleep()
     profile_dirs = [
         Path(tempfile.mkdtemp(prefix=f"pw_profile_{i}_"))
         for i in range(len(SITES))
