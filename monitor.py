@@ -132,7 +132,14 @@ if IS_LINUX:
 
 # ---- DISPLAY SLEEP PREVENTION -------------------------------------------
 
+_display_sleep_disabled = False
+
+
 def disable_display_sleep():
+    global _display_sleep_disabled
+    if _display_sleep_disabled:
+        return
+    _display_sleep_disabled = True
     if IS_LINUX and shutil.which("xset"):
         for args in (
             ["xset", "s", "off"],       # disable screensaver
@@ -154,6 +161,10 @@ def disable_display_sleep():
 
 
 def enable_display_sleep():
+    global _display_sleep_disabled
+    if not _display_sleep_disabled:
+        return
+    _display_sleep_disabled = False
     if IS_LINUX and shutil.which("xset"):
         for args in (
             ["xset", "s", "on"],        # re-enable screensaver
