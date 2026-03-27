@@ -43,11 +43,10 @@ SITES: list[SiteConfig] = [
         submit_selector        = "button[type='submit'], input[type='submit']",
         logged_in_selector     = "",
         logged_in_url_fragment = "",
-        # availability_check_text: if set, the site is only considered available
-        # when this string appears in the response body.  Catches reverse proxies
-        # or maintenance pages that return HTTP 200 with replacement content.
-        # Leave as "" to rely on HTTP status codes only.
-        availability_check_text = "",  # e.g. "Login" or "dashboard"
+        # availability_check_selector: CSS selector that must exist in the fully
+        # rendered page (checked via headless Playwright, so JS content is visible).
+        # More reliable than a plain HTTP check for JS-heavy sites.
+        availability_check_selector = "",  # e.g. "#login-form" or ".dashboard-header"
         schedule               = [],   # always active — replace with time windows to restrict
         # schedule             = [("Mon-Fri", "09:00", "17:00")],
         # schedule             = [("Mon-Fri", "08:00", "18:00"), ("Sat", "09:00", "13:00")],

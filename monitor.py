@@ -602,17 +602,36 @@ class SiteMonitor:
         await self._launch_context()
         await self.navigate_and_login()
 
-    async def _check_content_available(self) -> bool:
-        """Check the rendered page content for availability_check_text.
-        Uses page.content() so JavaScript-rendered content is included.
-        Returns True if no check text is configured."""
-        if not self.cfg.availability_check_text:
+    async def _playwright_availability_check(self) -> bool:
+        """Launch a temporary headless browser, navigate to the site URL, and
+        verify that availability_check_selector exists in the rendered DOM.
+        Returns True immediately if no selector is configured."""
+        if not self.cfg.availability_check_selector:
             return True
+        browser = None
         try:
-            content = await self.page.content()
-            return self.cfg.availability_check_text in content
-        except Exception:
-            return True   # non-fatal; don't block on unexpected errors
+            browser = await self.pw.chromium.launch(
+                headless = True,
+            )
+            page = await browser.new_page(ignore_https_errors=True)
+            await page.goto(self.cfg.url, wait_until="networkidle", timeout=15_000)
+            el = await page.query_selector(self.cfg.availability_check_selector)
+            available = el is not None
+            if not available:
+                self.log.warning(
+                    "Selector '%s' not found - site unavailable.",
+                    self.cfg.availability_check_selector,
+                )
+            return available
+        except Exception as exc:
+            self.log.warning("Headless availability check failed: %s", exc)
+            return False
+        finally:
+            if browser:
+                try:
+                    await browser.close()
+                except Exception:
+                    pass
 
     async def _show_unavailable_page(self):
         if self._showing_unavailable:
@@ -635,33 +654,27 @@ class SiteMonitor:
         await self._launch_context()
         if not await check_internet():
             await self._show_offline_page()
-        elif not await check_site_available(self.cfg.url):
+        elif not (
+            await check_site_available(self.cfg.url)
+            and await self._playwright_availability_check()
+        ):
             await self._show_unavailable_page()
         else:
             await self.navigate_and_login()
 
     async def navigate_and_login(self):
         self.log.info("Navigating to %s", self.cfg.url)
-        response = None
         try:
-            response = await self.page.goto(self.cfg.url, wait_until="networkidle", timeout=30_000)
+            await self.page.goto(self.cfg.url, wait_until="networkidle", timeout=30_000)
         except PlaywrightTimeoutError:
             self.log.warning("Page load timed out - continuing anyway.")
         except Exception as exc:
             if is_closed_error(exc):
                 raise
             self.log.warning("Navigation warning: %s", exc)
-        if response is not None and response.status >= 500:
-            self.log.warning("Site returned HTTP %d - marking unavailable.", response.status)
-            await self._show_unavailable_page()
-            return
         await asyncio.sleep(2)
         if not self.cfg.fullscreen:
             await fit_viewport_to_window(self.page)
-        if not await self._check_content_available():
-            self.log.warning("Content check failed - site appears unavailable.")
-            await self._show_unavailable_page()
-            return
         if not await self.is_logged_in():
             await self.login()
         else:
@@ -745,20 +758,11 @@ class SiteMonitor:
 
     async def refresh(self):
         self.log.info("Refreshing page ...")
-        response = None
         try:
-            response = await self.page.reload(wait_until="networkidle", timeout=30_000)
+            await self.page.reload(wait_until="networkidle", timeout=30_000)
         except PlaywrightTimeoutError:
             self.log.warning("Reload timed out - continuing.")
-        if response is not None and response.status >= 500:
-            self.log.warning("Site returned HTTP %d on refresh - marking unavailable.", response.status)
-            await self._show_unavailable_page()
-            return
         await asyncio.sleep(2)
-        if not await self._check_content_available():
-            self.log.warning("Content check failed after refresh - site appears unavailable.")
-            await self._show_unavailable_page()
-            return
         if not await self.is_logged_in():
             self.log.warning("Session expired after refresh - re-logging in.")
             await self.login()
@@ -787,7 +791,10 @@ class SiteMonitor:
                     self._seconds_since_pos_check = 0
                     continue
 
-                available = await check_site_available(self.cfg.url)
+                available = (
+                    await check_site_available(self.cfg.url)
+                    and await self._playwright_availability_check()
+                )
                 if not available:
                     await self._show_unavailable_page()
                     continue

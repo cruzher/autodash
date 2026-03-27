@@ -52,13 +52,14 @@ class SiteConfig:
     extra_password_selectors: list = field(default_factory=list)
 
     # ── Availability check ───────────────────────────────────────────────────
-    # If set, the site is only considered available when this string is found
-    # in the HTTP response body.  Useful when a reverse proxy, load balancer,
-    # or maintenance page returns HTTP 200 with replacement content instead of
-    # a proper error status.
-    # Leave empty to rely on HTTP status codes only (default).
-    # Example: availability_check_text = "Login"
-    availability_check_text: str = ""
+    # If set, a headless Playwright session navigates to the URL and checks
+    # whether this CSS selector exists in the fully-rendered page.  More
+    # reliable than a plain HTTP check because JavaScript is executed,
+    # so dynamic/SPA content is visible.
+    # Leave empty to skip (default).
+    # Example: availability_check_selector = "#login-form"
+    # Example: availability_check_selector = ".dashboard-header"
+    availability_check_selector: str = ""
 
     # ── Schedule ─────────────────────────────────────────────────────────────
     # List of active time windows.  Empty list (default) = always active.
