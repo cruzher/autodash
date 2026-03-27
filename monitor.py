@@ -13,6 +13,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote as _url_quote
 
 from playwright.async_api import (
     async_playwright,
@@ -40,12 +41,42 @@ SCHEDULE_CHECK_SECONDS    = 60
 INTERNET_CHECK_HOST    = "8.8.8.8"
 INTERNET_CHECK_PORT    = 53
 INTERNET_CHECK_TIMEOUT = 3
+SITE_CHECK_TIMEOUT     = 8
 
-_OFFLINE_HTML_PATH     = Path(__file__).parent / "offline.html"
-_OFFLINE_URL           = _OFFLINE_HTML_PATH.as_uri()
+_OFFLINE_HTML_PATH          = Path(__file__).parent / "offline.html"
+_OFFLINE_URL                = _OFFLINE_HTML_PATH.as_uri()
 
-_NO_SCHEDULE_HTML_PATH = Path(__file__).parent / "no_schedule.html"
-_NO_SCHEDULE_URL       = _NO_SCHEDULE_HTML_PATH.as_uri()
+_NO_SCHEDULE_HTML_PATH      = Path(__file__).parent / "no_schedule.html"
+_NO_SCHEDULE_URL            = _NO_SCHEDULE_HTML_PATH.as_uri()
+
+_SITE_UNAVAILABLE_HTML_PATH = Path(__file__).parent / "site_unavailable.html"
+_SITE_UNAVAILABLE_URL       = _SITE_UNAVAILABLE_HTML_PATH.as_uri()
+
+
+async def check_site_available(url: str) -> bool:
+    """Return True if url responds with a non-5xx HTTP status.
+    4xx (e.g. 401 on a login page) counts as available — the server is up."""
+    import urllib.request
+    import urllib.error
+
+    def _head():
+        try:
+            req = urllib.request.Request(url, method="HEAD")
+            with urllib.request.urlopen(req, timeout=SITE_CHECK_TIMEOUT) as resp:
+                return resp.status < 500
+        except urllib.error.HTTPError as exc:
+            return exc.code < 500
+        except Exception:
+            return False
+
+    try:
+        loop = asyncio.get_running_loop()
+        return await asyncio.wait_for(
+            loop.run_in_executor(None, _head),
+            timeout=SITE_CHECK_TIMEOUT + 2,
+        )
+    except Exception:
+        return False
 
 
 async def check_internet() -> bool:
@@ -372,7 +403,8 @@ class SiteMonitor:
         self._closed      = False
         self._window_id   = None
         self._seconds_since_pos_check = 0
-        self._showing_offline = False
+        self._showing_offline      = False
+        self._showing_unavailable  = False
         self._stable_geom = None   # actual geometry as reported by xdotool after positioning
         self.log          = logging.getLogger(cfg.name)
 
@@ -393,10 +425,11 @@ class SiteMonitor:
                 await self.context.close()
             except Exception:
                 pass
-            self.context   = None
-            self.page      = None
-            self._window_id = None
-            self._stable_geom = None
+            self.context              = None
+            self.page                 = None
+            self._window_id           = None
+            self._stable_geom         = None
+            self._showing_unavailable = False
 
         self._write_profile_prefs()
 
@@ -547,7 +580,8 @@ class SiteMonitor:
             self.page         = None
             self._window_id   = None
             self._stable_geom = None
-        self._showing_offline = False
+        self._showing_offline     = False
+        self._showing_unavailable = False
         self.log.info("Window closed by coordinator.")
 
     async def _show_offline_page(self):
@@ -563,10 +597,26 @@ class SiteMonitor:
         await self._launch_context()
         await self.navigate_and_login()
 
+    async def _show_unavailable_page(self):
+        if self._showing_unavailable:
+            return
+        self.log.warning("Site unavailable - opening fullscreen notice.")
+        self._showing_unavailable = True
+        url = _SITE_UNAVAILABLE_URL + "#" + _url_quote(self.cfg.name)
+        await self._launch_fullscreen_window(url)
+
+    async def _restore_from_unavailable(self):
+        self.log.info("Site back online - reopening dashboard window.")
+        self._showing_unavailable = False
+        await self._launch_context()
+        await self.navigate_and_login()
+
     async def start(self):
         await self._launch_context()
         if not await check_internet():
             await self._show_offline_page()
+        elif not await check_site_available(self.cfg.url):
+            await self._show_unavailable_page()
         else:
             await self.navigate_and_login()
 
@@ -695,6 +745,16 @@ class SiteMonitor:
                     continue
                 if self._showing_offline:
                     await self._restore_from_offline()
+                    seconds_since_refresh         = 0
+                    self._seconds_since_pos_check = 0
+                    continue
+
+                available = await check_site_available(self.cfg.url)
+                if not available:
+                    await self._show_unavailable_page()
+                    continue
+                if self._showing_unavailable:
+                    await self._restore_from_unavailable()
                     seconds_since_refresh         = 0
                     self._seconds_since_pos_check = 0
                     continue

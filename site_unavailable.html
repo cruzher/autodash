@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Site Unavailable</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .card {
+      text-align: center;
+      max-width: 560px;
+      padding: 0 2rem;
+      animation: fadein 0.6s ease;
+    }
+
+    @keyframes fadein {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .icon {
+      font-size: 6rem;
+      line-height: 1;
+      margin-bottom: 1.5rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      color: #f0f6fc;
+    }
+
+    .site-name {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #e3b341;
+      margin-bottom: 1.25rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    p {
+      font-size: 1.1rem;
+      color: #8b949e;
+      line-height: 1.6;
+      margin-bottom: 2rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 2rem;
+      padding: 0.5rem 1.25rem;
+      font-size: 0.9rem;
+      color: #8b949e;
+    }
+
+    .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #e3b341;
+      animation: pulse 1.8s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.4; transform: scale(0.8); }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">&#x26A0;&#xFE0F;</div>
+    <h1>Site Unavailable</h1>
+    <div class="site-name" id="site-name"></div>
+    <p>The dashboard is not responding.<br>It will reopen automatically once it becomes available.</p>
+    <span class="badge">
+      <span class="dot"></span>
+      Waiting for site&hellip;
+    </span>
+  </div>
+  <script>
+    const name = decodeURIComponent(window.location.hash.slice(1));
+    if (name) document.getElementById("site-name").textContent = name;
+  </script>
+</body>
+</html>
