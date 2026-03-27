@@ -4,6 +4,7 @@ monitor.py - Multi-Site Auto-Login Monitor using Playwright (Chromium)
 
 import asyncio
 import datetime
+import importlib.util
 import json
 import logging
 import os
@@ -51,6 +52,16 @@ _NO_SCHEDULE_URL            = _NO_SCHEDULE_HTML_PATH.as_uri()
 
 _SITE_UNAVAILABLE_HTML_PATH = Path(__file__).parent / "site_unavailable.html"
 _SITE_UNAVAILABLE_URL       = _SITE_UNAVAILABLE_HTML_PATH.as_uri()
+
+_SITES_PATH = Path(__file__).parent / "sites.py"
+
+
+def _load_sites() -> list:
+    """Reload sites.py from disk and return its SITES list."""
+    spec = importlib.util.spec_from_file_location("sites_hot", _SITES_PATH)
+    mod  = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.SITES
 
 
 async def check_site_available(url: str) -> bool:
@@ -865,6 +876,7 @@ async def schedule_coordinator(monitors, pw):
 
     active_tasks = {}          # SiteMonitor -> asyncio.Task
     was_active   = {m: None for m in monitors}   # None = first tick not yet run
+    sites_mtime  = _SITES_PATH.stat().st_mtime if _SITES_PATH.exists() else 0.0
 
     # Notice window state (managed as a bare context, not a SiteMonitor)
     notice_context = None
@@ -969,6 +981,60 @@ async def schedule_coordinator(monitors, pw):
             await _close_notice()
         else:
             await _open_notice()
+
+        # ── Hot-reload sites.py ───────────────────────────────────────────
+        try:
+            mtime = _SITES_PATH.stat().st_mtime
+        except OSError:
+            mtime = sites_mtime
+
+        if mtime != sites_mtime:
+            sites_mtime = mtime
+            try:
+                new_cfgs = _load_sites()
+                log.info("sites.py changed — reconciling monitors.")
+            except Exception as exc:
+                log.error("Failed to reload sites.py: %s", exc)
+                new_cfgs = None
+
+            if new_cfgs is not None:
+                old_by_name = {m.cfg.name: m for m in list(monitors)}
+                new_by_name = {cfg.name: cfg for cfg in new_cfgs}
+
+                async def _stop_monitor(m):
+                    t = active_tasks.pop(m, None)
+                    if t and not t.done():
+                        t.cancel()
+                        try:
+                            await asyncio.wait_for(asyncio.shield(t), timeout=5)
+                        except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
+                            pass
+                    await m.close_window()
+                    monitors.remove(m)
+                    was_active.pop(m, None)
+
+                # Remove sites no longer present
+                for name, m in list(old_by_name.items()):
+                    if name not in new_by_name:
+                        log.info("sites.py: removing '%s'.", name)
+                        await _stop_monitor(m)
+
+                # Add new sites / restart changed sites
+                for cfg in new_cfgs:
+                    existing = old_by_name.get(cfg.name)
+                    if existing is None:
+                        log.info("sites.py: adding '%s'.", cfg.name)
+                        profile_dir = Path(tempfile.mkdtemp(prefix=f"pw_profile_{cfg.name}_"))
+                        m = SiteMonitor(cfg, pw, profile_dir)
+                        monitors.append(m)
+                        was_active[m] = None
+                    elif existing.cfg != cfg:
+                        log.info("sites.py: config changed for '%s', restarting.", cfg.name)
+                        await _stop_monitor(existing)
+                        profile_dir = Path(tempfile.mkdtemp(prefix=f"pw_profile_{cfg.name}_"))
+                        m = SiteMonitor(cfg, pw, profile_dir)
+                        monitors.append(m)
+                        was_active[m] = None
 
         await asyncio.sleep(SCHEDULE_CHECK_SECONDS)
 
