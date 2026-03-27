@@ -160,6 +160,18 @@ def disable_display_sleep():
         logging.info("Display sleep disabled via SetThreadExecutionState.")
 
 
+def wake_display():
+    """Force the display on after it may have gone to sleep."""
+    if IS_LINUX and shutil.which("xset"):
+        r = run_cmd(["xset", "dpms", "force", "on"])
+        if r.returncode != 0:
+            logging.warning("xset dpms force on failed.")
+    elif platform.system() == "Windows":
+        import ctypes
+        # Simulate a harmless mouse move to wake the display
+        ctypes.windll.user32.mouse_event(0x0001, 0, 0, 0, 0)
+
+
 def enable_display_sleep():
     global _display_sleep_disabled
     if not _display_sleep_disabled:
@@ -936,6 +948,7 @@ async def schedule_coordinator(monitors, pw):
     async def _close_notice():
         nonlocal notice_context
         disable_display_sleep()
+        wake_display()
         if notice_context is None:
             return
         log.info("A monitor became active — closing notice window.")
