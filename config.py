@@ -51,6 +51,15 @@ class SiteConfig:
     extra_username_selectors: list = field(default_factory=list)
     extra_password_selectors: list = field(default_factory=list)
 
+    # ── Availability check ───────────────────────────────────────────────────
+    # If set, the site is only considered available when this string is found
+    # in the HTTP response body.  Useful when a reverse proxy, load balancer,
+    # or maintenance page returns HTTP 200 with replacement content instead of
+    # a proper error status.
+    # Leave empty to rely on HTTP status codes only (default).
+    # Example: availability_check_text = "Login"
+    availability_check_text: str = ""
+
     # ── Schedule ─────────────────────────────────────────────────────────────
     # List of active time windows.  Empty list (default) = always active.
     # Each entry is a 2- or 3-tuple:
