@@ -50,3 +50,15 @@ class SiteConfig:
     # Extra fallback selectors tried after the primary ones above
     extra_username_selectors: list = field(default_factory=list)
     extra_password_selectors: list = field(default_factory=list)
+
+    # ── Schedule ─────────────────────────────────────────────────────────────
+    # List of active time windows.  Empty list (default) = always active.
+    # Each entry is a 2- or 3-tuple:
+    #   ("HH:MM", "HH:MM")                  — active every day
+    #   ("day-spec", "HH:MM", "HH:MM")      — restricted to matching days
+    # Day specs: "Mon-Fri", "Sat,Sun", "Mon", "Tue", …, "*" (every day)
+    # Examples:
+    #   schedule = [("Mon-Fri", "09:00", "17:00")]
+    #   schedule = [("Mon-Fri", "08:00", "18:00"), ("Sat", "08:00", "13:00")]
+    #   schedule = [("09:00", "17:00")]        # every day, 9 to 5
+    schedule: list = field(default_factory=list)

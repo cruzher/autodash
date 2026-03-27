@@ -56,6 +56,7 @@ Edit `sites.py` and fill in one `SiteConfig` entry per dashboard. Each entry ope
 | `window_width` | `1280` | Window width in pixels |
 | `window_height` | `900` | Window height in pixels |
 | `post_login_url` | `""` | Navigate here after login; leave empty to stay on the landing page |
+| `schedule` | `[]` | List of active time windows (see [Scheduling](#scheduling)). Empty = always active |
 | `username_selector` | *(auto)* | CSS selector for the username field |
 | `password_selector` | *(auto)* | CSS selector for the password field |
 | `submit_selector` | *(auto)* | CSS selector for the submit button |
@@ -90,6 +91,45 @@ SITES = [
     ),
 ]
 ```
+
+---
+
+## Scheduling
+
+Each site can optionally define a list of active time windows via the `schedule` field. When a site is outside its schedule its window is closed automatically. When no site is scheduled, a fullscreen **"No Dashboard Scheduled"** notice is shown and the display is allowed to sleep. The windows reopen automatically when a schedule window starts.
+
+An empty `schedule` (the default) means the site is **always active** — identical to the pre-scheduling behaviour.
+
+### Entry formats
+
+| Format | Example | Meaning |
+|---|---|---|
+| `("HH:MM", "HH:MM")` | `("09:00", "17:00")` | Every day, 09:00–17:00 |
+| `("day-spec", "HH:MM", "HH:MM")` | `("Mon-Fri", "09:00", "17:00")` | Weekdays only |
+
+**Day specs:**
+
+| Spec | Meaning |
+|---|---|
+| `"Mon-Fri"` | Monday through Friday |
+| `"Sat,Sun"` | Saturday and Sunday |
+| `"Mon"` | Monday only |
+| `"*"` | Every day |
+
+Multiple windows can be listed in a single schedule:
+
+```python
+schedule = [
+    ("Mon-Fri", "08:00", "18:00"),
+    ("Sat",     "09:00", "13:00"),
+]
+```
+
+Overnight windows (e.g. `"22:00"` to `"06:00"`) are supported.
+
+### Schedule check interval
+
+The schedule is checked every `SCHEDULE_CHECK_SECONDS` (default `60`) seconds. Windows open/close within one check interval of the boundary time.
 
 ---
 
@@ -156,5 +196,6 @@ Replace the path with the actual location of `start.sh` on your system.
 | `sites.py` | Your site list (created from `sample-sites.py`) |
 | `sample-sites.py` | Template for `sites.py` |
 | `offline.html` | Fullscreen page shown when internet is unavailable |
+| `no_schedule.html` | Fullscreen page shown when no site is currently scheduled |
 | `start.sh` | Bootstrap and launch script |
 | `requirements.txt` | Python dependencies |

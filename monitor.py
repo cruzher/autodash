@@ -3,6 +3,7 @@ monitor.py - Multi-Site Auto-Login Monitor using Playwright (Chromium)
 """
 
 import asyncio
+import datetime
 import json
 import logging
 import os
@@ -32,6 +33,7 @@ CHECK_INTERVAL_SECONDS    = 30
 RECONNECT_DELAY_SECONDS   = 5
 POSITION_CHECK_SECONDS    = 10
 POSITION_TOLERANCE_PX     = 5
+SCHEDULE_CHECK_SECONDS    = 60
 
 # ---- CONNECTIVITY -------------------------------------------------------
 
@@ -39,8 +41,11 @@ INTERNET_CHECK_HOST    = "8.8.8.8"
 INTERNET_CHECK_PORT    = 53
 INTERNET_CHECK_TIMEOUT = 3
 
-_OFFLINE_HTML_PATH = Path(__file__).parent / "offline.html"
-_OFFLINE_URL = _OFFLINE_HTML_PATH.as_uri()
+_OFFLINE_HTML_PATH     = Path(__file__).parent / "offline.html"
+_OFFLINE_URL           = _OFFLINE_HTML_PATH.as_uri()
+
+_NO_SCHEDULE_HTML_PATH = Path(__file__).parent / "no_schedule.html"
+_NO_SCHEDULE_URL       = _NO_SCHEDULE_HTML_PATH.as_uri()
 
 
 async def check_internet() -> bool:
@@ -99,6 +104,24 @@ def disable_display_sleep():
             ES_CONTINUOUS | ES_DISPLAY_REQUIRED
         )
         logging.info("Display sleep disabled via SetThreadExecutionState.")
+
+
+def enable_display_sleep():
+    if IS_LINUX and shutil.which("xset"):
+        for args in (
+            ["xset", "s", "on"],        # re-enable screensaver
+            ["xset", "+dpms"],          # re-enable DPMS power management
+            ["xset", "s", "blank"],     # re-enable screen blanking
+        ):
+            r = run_cmd(args)
+            if r.returncode != 0:
+                logging.warning("xset command failed: %s", " ".join(args))
+        logging.info("Display sleep re-enabled via xset.")
+    elif platform.system() == "Windows":
+        import ctypes
+        ES_CONTINUOUS = 0x80000000
+        ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS)
+        logging.info("Display sleep re-enabled via SetThreadExecutionState.")
 
 
 # ---- HELPERS ------------------------------------------------------------
@@ -270,6 +293,72 @@ async def position_window(cfg, page):
     await fit_viewport_to_window(page)
 
 
+# ---- SCHEDULING ---------------------------------------------------------
+
+_DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+
+def _parse_day_spec(spec: str) -> set:
+    spec = spec.strip()
+    if spec == "*":
+        return set(range(7))
+    result = set()
+    for part in spec.split(","):
+        part = part.strip()
+        if "-" in part:
+            a, _, b = part.partition("-")
+            try:
+                start_idx = _DAY_NAMES.index(a.strip())
+                end_idx   = _DAY_NAMES.index(b.strip())
+            except ValueError:
+                raise ValueError(f"Unknown day name in schedule: {part!r}")
+            if start_idx <= end_idx:
+                result.update(range(start_idx, end_idx + 1))
+            else:
+                result.update(range(start_idx, 7))
+                result.update(range(0, end_idx + 1))
+        else:
+            try:
+                result.add(_DAY_NAMES.index(part))
+            except ValueError:
+                raise ValueError(f"Unknown day name in schedule: {part!r}")
+    return result
+
+
+def _parse_hhmm(s: str) -> datetime.time:
+    try:
+        h, m = s.strip().split(":")
+        return datetime.time(int(h), int(m))
+    except Exception:
+        raise ValueError(f"Invalid time format (expected HH:MM): {s!r}")
+
+
+def _time_in_window(t, start, end) -> bool:
+    if start <= end:
+        return start <= t < end
+    return t >= start or t < end   # overnight window
+
+
+def is_scheduled_now(schedule: list) -> bool:
+    """Return True if the current time falls within any window in schedule.
+    An empty schedule means always active."""
+    if not schedule:
+        return True
+    now     = datetime.datetime.now()
+    current = now.time().replace(second=0, microsecond=0)
+    today   = now.weekday()   # 0=Mon … 6=Sun
+    for entry in schedule:
+        if len(entry) == 2:
+            if _time_in_window(current, _parse_hhmm(entry[0]), _parse_hhmm(entry[1])):
+                return True
+        elif len(entry) == 3:
+            if today not in _parse_day_spec(str(entry[0])):
+                continue
+            if _time_in_window(current, _parse_hhmm(entry[1]), _parse_hhmm(entry[2])):
+                return True
+    return False
+
+
 # ---- SITE MONITOR -------------------------------------------------------
 
 class SiteMonitor:
@@ -405,16 +494,16 @@ class SiteMonitor:
             if settled:
                 self._stable_geom = settled
 
-    async def _launch_offline_context(self):
-        """Close the current window and open a new fullscreen one with the offline page."""
+    async def _launch_fullscreen_window(self, url: str):
+        """Close the current context and open a new fullscreen window at url."""
         if self.context:
             try:
                 await self.context.close()
             except Exception:
                 pass
-            self.context    = None
-            self.page       = None
-            self._window_id = None
+            self.context      = None
+            self.page         = None
+            self._window_id   = None
             self._stable_geom = None
 
         launch_env = {"DISPLAY": os.environ.get("DISPLAY", ":0")} if IS_LINUX else {}
@@ -423,7 +512,7 @@ class SiteMonitor:
             user_data_dir       = str(self.profile_dir),
             headless            = False,
             args                = [
-                f"--app={_OFFLINE_URL}",
+                f"--app={url}",
                 "--start-fullscreen",
                 "--disable-infobars",
                 "--test-type",
@@ -442,6 +531,24 @@ class SiteMonitor:
         self.context.on("close", self._on_context_closed)
         pages = self.context.pages
         self.page = pages[0] if pages else await self.context.new_page()
+
+    async def _launch_offline_context(self):
+        await self._launch_fullscreen_window(_OFFLINE_URL)
+
+    async def close_window(self):
+        """Close the browser window. Called by the schedule coordinator."""
+        self._closed = True   # suppress the "will reopen" warning from _on_context_closed
+        if self.context:
+            try:
+                await self.context.close()
+            except Exception:
+                pass
+            self.context      = None
+            self.page         = None
+            self._window_id   = None
+            self._stable_geom = None
+        self._showing_offline = False
+        self.log.info("Window closed by coordinator.")
 
     async def _show_offline_page(self):
         if self._showing_offline:
@@ -633,10 +740,137 @@ class SiteMonitor:
         return None
 
 
+# ---- SCHEDULE COORDINATOR -----------------------------------------------
+
+def _make_task_done_cb(name, log):
+    def _cb(task):
+        if task.cancelled():
+            return
+        try:
+            exc = task.exception()
+            if exc:
+                log.error("Monitor '%s' crashed: %s", name, exc, exc_info=exc)
+        except asyncio.CancelledError:
+            pass
+    return _cb
+
+
+async def schedule_coordinator(monitors, pw):
+    log = logging.getLogger("coordinator")
+
+    active_tasks = {}          # SiteMonitor -> asyncio.Task
+    was_active   = {m: None for m in monitors}   # None = first tick not yet run
+
+    # Notice window state (managed as a bare context, not a SiteMonitor)
+    notice_context = None
+
+    async def _open_notice():
+        nonlocal notice_context
+        if notice_context is not None:
+            try:
+                # reopen if it was closed by the user
+                if notice_context.pages and not notice_context.pages[0].is_closed():
+                    return
+            except Exception:
+                pass
+            try:
+                await notice_context.close()
+            except Exception:
+                pass
+            notice_context = None
+
+        log.info("No monitors active — showing 'No dashboard scheduled' notice.")
+        enable_display_sleep()
+        launch_env = {"DISPLAY": os.environ.get("DISPLAY", ":0")} if IS_LINUX else {}
+        try:
+            notice_context = await pw.chromium.launch_persistent_context(
+                user_data_dir       = str(Path(tempfile.mkdtemp(prefix="pw_notice_"))),
+                headless            = False,
+                args                = [
+                    f"--app={_NO_SCHEDULE_URL}",
+                    "--start-fullscreen",
+                    "--disable-infobars",
+                    "--test-type",
+                    "--no-default-browser-check",
+                    "--no-first-run",
+                    "--disable-extensions",
+                    "--password-store=basic",
+                ],
+                ignore_default_args = ["--enable-automation"],
+                no_viewport         = True,
+                ignore_https_errors = True,
+                env                 = launch_env,
+            )
+        except Exception as exc:
+            log.error("Failed to open notice window: %s", exc)
+            notice_context = None
+
+    async def _close_notice():
+        nonlocal notice_context
+        if notice_context is None:
+            return
+        log.info("A monitor became active — closing notice window.")
+        disable_display_sleep()
+        try:
+            await notice_context.close()
+        except Exception:
+            pass
+        notice_context = None
+
+    while True:
+        any_active = False
+
+        for m in monitors:
+            active = is_scheduled_now(m.cfg.schedule)
+            if active:
+                any_active = True
+
+            prev = was_active[m]
+
+            if active and (prev is None or not prev):
+                # Entering schedule window (or first tick while active)
+                existing = active_tasks.get(m)
+                if existing and not existing.done():
+                    # Already running — nothing to do
+                    pass
+                else:
+                    log.info("Starting monitor '%s'.", m.cfg.name)
+                    try:
+                        await m.start()
+                        t = asyncio.create_task(m.run_loop(), name=m.cfg.name)
+                        t.add_done_callback(_make_task_done_cb(m.cfg.name, log))
+                        active_tasks[m] = t
+                    except Exception as exc:
+                        log.error("Failed to start '%s': %s", m.cfg.name, exc, exc_info=True)
+
+            elif not active and prev:
+                # Leaving schedule window
+                log.info("Monitor '%s' outside schedule — closing.", m.cfg.name)
+                t = active_tasks.pop(m, None)
+                if t and not t.done():
+                    t.cancel()
+                    try:
+                        await asyncio.wait_for(asyncio.shield(t), timeout=5)
+                    except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
+                        pass
+                await m.close_window()
+
+            elif not active and prev is None:
+                log.info("Monitor '%s' outside schedule at startup — skipping.", m.cfg.name)
+
+            was_active[m] = active
+
+        if any_active:
+            await _close_notice()
+        else:
+            await _open_notice()
+
+        await asyncio.sleep(SCHEDULE_CHECK_SECONDS)
+
+
 # ---- ENTRY POINT --------------------------------------------------------
 
 async def main():
-    disable_display_sleep()
     profile_dirs = [
         Path(tempfile.mkdtemp(prefix=f"pw_profile_{i}_"))
         for i in range(len(SITES))
@@ -646,38 +880,17 @@ async def main():
             SiteMonitor(cfg, pw, profile_dirs[i])
             for i, cfg in enumerate(SITES)
         ]
-        started = []
-        for m in monitors:
-            try:
-                await m.start()
-                started.append(m)
-            except Exception as exc:
-                logging.error("Failed to start '%s': %s", m.cfg.name, exc, exc_info=True)
-        if not started:
-            logging.critical("No monitors started - exiting.")
-            return
-        loop_tasks = [
-            asyncio.create_task(m.run_loop(), name=m.cfg.name)
-            for m in started
-        ]
-        def _on_task_done(task):
-            if task.cancelled():
-                return
-            try:
-                exc = task.exception()
-                if exc:
-                    logging.error("Monitor '%s' crashed: %s", task.get_name(), exc, exc_info=exc)
-            except asyncio.CancelledError:
-                pass
-        for t in loop_tasks:
-            t.add_done_callback(_on_task_done)
+        coordinator = asyncio.create_task(
+            schedule_coordinator(monitors, pw), name="coordinator"
+        )
         try:
-            await asyncio.gather(*loop_tasks, return_exceptions=True)
+            await coordinator
         except asyncio.CancelledError:
             pass
         finally:
             logging.info("Shutting down ...")
-            for m in started:
+            coordinator.cancel()
+            for m in monitors:
                 try:
                     if m.context:
                         await m.context.close()
