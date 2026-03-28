@@ -143,6 +143,7 @@ def disable_display_sleep():
     if IS_LINUX and shutil.which("xset"):
         for args in (
             ["xset", "s", "off"],       # disable screensaver
+            ["xset", "s", "0", "0"],    # set screensaver timeout to 0 (explicit)
             ["xset", "-dpms"],          # disable DPMS power management
             ["xset", "s", "noblank"],   # disable screen blanking
         ):
@@ -715,32 +716,66 @@ class SiteMonitor:
             self.log.info("Already logged in.")
             await self._maybe_goto_post_login()
 
+    async def _login_with_steps(self):
+        subs = {"{username}": self.cfg.username, "{password}": self.cfg.password}
+        for step in self.cfg.login_steps:
+            value = step.value
+            for k, v in subs.items():
+                value = value.replace(k, v)
+
+            if step.action == "fill":
+                el = await self._find_element([step.selector])
+                if el is None:
+                    self.log.error("Login step: element not found: %s", step.selector)
+                    return
+                await el.click()
+                await el.fill(value)
+
+            elif step.action == "click":
+                el = await self._find_element([step.selector])
+                if el is None:
+                    self.log.error("Login step: element not found: %s", step.selector)
+                    return
+                await el.click()
+                await asyncio.sleep(1)
+
+            elif step.action == "wait_for":
+                try:
+                    await self.page.wait_for_selector(step.selector, timeout=15_000)
+                except PlaywrightTimeoutError:
+                    self.log.error("Login step: timed out waiting for: %s", step.selector)
+                    return
+
+            else:
+                self.log.warning("Login step: unknown action '%s' — skipping.", step.action)
+
     async def login(self):
         self.log.info("Attempting login ...")
-        username_field = await self._find_element(
-            [self.cfg.username_selector] + self.cfg.extra_username_selectors
-        )
-        if username_field is None:
-            self.log.error("Username field not found - check username_selector in sites.py.")
-            return
-        password_field = await self._find_element(
-            [self.cfg.password_selector] + self.cfg.extra_password_selectors
-        )
-        if password_field is None:
-            self.log.error("Password field not found - check password_selector in sites.py.")
-            return
-        await username_field.click()
-        await username_field.fill("")
-        await username_field.type(self.cfg.username, delay=50)
-        await password_field.click()
-        await password_field.fill("")
-        await password_field.type(self.cfg.password, delay=50)
-        submit = await self._find_element([self.cfg.submit_selector])
-        if submit:
-            await submit.click()
+        if self.cfg.login_steps:
+            await self._login_with_steps()
         else:
-            self.log.warning("Submit button not found - pressing Enter.")
-            await password_field.press("Enter")
+            username_field = await self._find_element(
+                [self.cfg.username_selector] + self.cfg.extra_username_selectors
+            )
+            if username_field is None:
+                self.log.error("Username field not found - check username_selector in sites.py.")
+                return
+            password_field = await self._find_element(
+                [self.cfg.password_selector] + self.cfg.extra_password_selectors
+            )
+            if password_field is None:
+                self.log.error("Password field not found - check password_selector in sites.py.")
+                return
+            await username_field.click()
+            await username_field.fill(self.cfg.username)
+            await password_field.click()
+            await password_field.fill(self.cfg.password)
+            submit = await self._find_element([self.cfg.submit_selector])
+            if submit:
+                await submit.click()
+            else:
+                self.log.warning("Submit button not found - pressing Enter.")
+                await password_field.press("Enter")
         try:
             await self.page.wait_for_load_state("networkidle", timeout=15_000)
         except PlaywrightTimeoutError:
@@ -1065,6 +1100,17 @@ async def schedule_coordinator(monitors, pw):
 
 # ---- ENTRY POINT --------------------------------------------------------
 
+async def display_keepalive():
+    """Periodically reset the X11 screensaver timer to prevent blanking on Linux.
+    Runs only when display sleep is currently disabled."""
+    if not IS_LINUX or not shutil.which("xset"):
+        return
+    while True:
+        await asyncio.sleep(50)
+        if _display_sleep_disabled:
+            run_cmd(["xset", "s", "reset"])
+
+
 async def main():
     disable_display_sleep()
     profile_dirs = [
@@ -1079,6 +1125,7 @@ async def main():
         coordinator = asyncio.create_task(
             schedule_coordinator(monitors, pw), name="coordinator"
         )
+        keepalive = asyncio.create_task(display_keepalive(), name="keepalive")
         try:
             await coordinator
         except asyncio.CancelledError:
@@ -1086,6 +1133,7 @@ async def main():
         finally:
             logging.info("Shutting down ...")
             coordinator.cancel()
+            keepalive.cancel()
             for m in monitors:
                 try:
                     if m.context:

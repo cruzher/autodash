@@ -65,7 +65,67 @@ Edit `sites.py` and fill in one `SiteConfig` entry per dashboard. Each entry ope
 | `extra_username_selectors` | `[]` | Additional fallback CSS selectors for the username field |
 | `extra_password_selectors` | `[]` | Additional fallback CSS selectors for the password field |
 
-### 3. Example with two windows side by side
+### 3. Multi-step and multi-field login (`login_steps`)
+
+Some sites show the username and password on separate pages (e.g. Microsoft, Google, many SSO portals), or include extra fields such as a domain or PIN. Use `login_steps` for these cases. When set it replaces the simple `username_selector` / `password_selector` / `submit_selector` flow entirely.
+
+Import `LoginStep` alongside `SiteConfig`:
+
+```python
+from config import SiteConfig, LoginStep
+```
+
+Each `LoginStep` takes an **action**, a **CSS selector**, and an optional **value**:
+
+| Action | Behaviour |
+|---|---|
+| `"fill"` | Finds the field, clears it, and types the value. Use `{username}` or `{password}` as placeholders. |
+| `"click"` | Clicks the element and waits 1 second for the page to react. |
+| `"wait_for"` | Waits up to 15 seconds for the selector to appear before continuing. |
+
+**Multi-step example** (username page → Next → password page → Sign in):
+
+```python
+SiteConfig(
+    ...
+    login_steps = [
+        LoginStep("fill",     "input[name='loginfmt']", "{username}"),
+        LoginStep("click",    "input[type='submit']"),
+        LoginStep("wait_for", "input[type='password']"),
+        LoginStep("fill",     "input[type='password']", "{password}"),
+        LoginStep("click",    "input[type='submit']"),
+    ],
+)
+```
+
+**Extra field example** (domain on the same page):
+
+```python
+login_steps = [
+    LoginStep("fill",  "input[name='username']", "{username}"),
+    LoginStep("fill",  "input[type='password']", "{password}"),
+    LoginStep("fill",  "input[name='domain']",   "CORP"),
+    LoginStep("click", "button[type='submit']"),
+]
+```
+
+#### Finding the right selector
+
+Right-click the field in the browser → **Inspect** and look at the `<input>` element's attributes. Common patterns:
+
+| Attribute | Selector example |
+|---|---|
+| `name` attribute | `input[name='Username']` |
+| `id` attribute | `#username` |
+| `placeholder` text | `input[placeholder='Username']` |
+| `aria-label` | `input[aria-label='Username']` |
+| ARIA role + name | `role=textbox[name='Username']` |
+
+> **Note:** `textbox` is an ARIA role, not an HTML element. Use `input[...]` for standard HTML fields. The ARIA `role=` syntax is only needed when the element has an explicit `role="textbox"` attribute.
+
+---
+
+### 5. Example with two windows side by side
 
 ```python
 from config import SiteConfig

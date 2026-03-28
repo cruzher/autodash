@@ -24,7 +24,7 @@ schedule             → list of active time windows; empty list = always active
                        the display is allowed to sleep until the next window opens.
 """
 
-from config import SiteConfig
+from config import SiteConfig, LoginStep
 
 SITES: list[SiteConfig] = [
     SiteConfig(
@@ -41,6 +41,22 @@ SITES: list[SiteConfig] = [
         username_selector      = "input[type='text'], input[name='username'], input[name='email'], input[id*='user'], input[id*='email']",
         password_selector      = "input[type='password']",
         submit_selector        = "button[type='submit'], input[type='submit']",
+        # login_steps: optional — when set, replaces username/password/submit above.
+        # Multi-step login (username page → password page):
+        #   login_steps = [
+        #       LoginStep("fill",     "input[name='loginfmt']", "{username}"),
+        #       LoginStep("click",    "input[type='submit']"),
+        #       LoginStep("wait_for", "input[type='password']"),
+        #       LoginStep("fill",     "input[type='password']", "{password}"),
+        #       LoginStep("click",    "input[type='submit']"),
+        #   ],
+        # Extra field on same page (e.g. domain):
+        #   login_steps = [
+        #       LoginStep("fill",  "input[name='username']", "{username}"),
+        #       LoginStep("fill",  "input[type='password']", "{password}"),
+        #       LoginStep("fill",  "input[name='domain']",   "CORP"),
+        #       LoginStep("click", "button[type='submit']"),
+        #   ],
         logged_in_selector     = "",
         logged_in_url_fragment = "",
         # availability_check_selector: CSS selector that must exist in the fully

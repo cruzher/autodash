@@ -8,6 +8,19 @@ from dataclasses import dataclass, field
 
 
 @dataclass
+class LoginStep:
+    """One action in a multi-step or multi-field login sequence.
+
+    action   : "fill" | "click" | "wait_for"
+    selector : CSS selector for the target element
+    value    : text to type (fill only); {username} and {password} are substituted
+    """
+    action:   str
+    selector: str
+    value:    str = ""
+
+
+@dataclass
 class SiteConfig:
     name:     str
     url:      str
@@ -50,6 +63,12 @@ class SiteConfig:
     # Extra fallback selectors tried after the primary ones above
     extra_username_selectors: list = field(default_factory=list)
     extra_password_selectors: list = field(default_factory=list)
+
+    # ── Multi-step / multi-field login ───────────────────────────────────────
+    # When set, replaces the simple username/password/submit flow entirely.
+    # Each LoginStep is one action: fill a field, click an element, or wait
+    # for an element to appear. Leave empty to use the simple flow (default).
+    login_steps: list = field(default_factory=list)
 
     # ── Availability check ───────────────────────────────────────────────────
     # If set, a headless Playwright session navigates to the URL and checks
