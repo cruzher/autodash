@@ -32,10 +32,10 @@ SITES: list[SiteConfig] = [
         # See README.md § "Multi-step and multi-field login" for details.
         # login_steps = [
         #     LoginStep("fill",     "input[name='loginfmt']", "{username}"),
-        #     LoginStep("click",    "input[type='submit']"),
+        #     LoginStep("press",    value="Enter"),
         #     LoginStep("wait_for", "input[type='password']"),
         #     LoginStep("fill",     "input[type='password']", "{password}"),
-        #     LoginStep("click",    "input[type='submit']"),
+        #     LoginStep("press",    value="Enter"),
         # ],
 
         logged_in_selector     = "",   # CSS selector present only when logged in

@@ -740,6 +740,17 @@ class SiteMonitor:
                 await el.click()
                 await asyncio.sleep(1)
 
+            elif step.action == "press":
+                if step.selector:
+                    el = await self._find_element([step.selector])
+                    if el is None:
+                        self.log.error("Login step: element not found: %s", step.selector)
+                        return
+                    await el.press(value or "Enter")
+                else:
+                    await self.page.keyboard.press(value or "Enter")
+                await asyncio.sleep(1)
+
             elif step.action == "wait_for":
                 try:
                     await self.page.wait_for_selector(step.selector, timeout=15_000)

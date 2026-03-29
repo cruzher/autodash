@@ -92,6 +92,7 @@ Each `LoginStep` takes an **action**, a **CSS selector**, and an optional **valu
 |---|---|
 | `"fill"` | Finds the field, clears it, and types the value. Use `{username}` or `{password}` as placeholders. |
 | `"click"` | Clicks the element and waits 1 second for the page to react. |
+| `"press"` | Presses a key. `value` is the key name (e.g. `"Enter"`, `"Tab"`); defaults to `Enter`. When `selector` is omitted the key is sent to whatever element is currently focused. |
 | `"wait_for"` | Waits up to 15 seconds for the selector to appear before continuing. |
 
 **Multi-step example** (username page → Next → password page → Sign in):
@@ -101,13 +102,16 @@ SiteConfig(
     ...
     login_steps = [
         LoginStep("fill",     "input[name='loginfmt']", "{username}"),
-        LoginStep("click",    "input[type='submit']"),
+        LoginStep("press",    value="Enter"),
         LoginStep("wait_for", "input[type='password']"),
         LoginStep("fill",     "input[type='password']", "{password}"),
-        LoginStep("click",    "input[type='submit']"),
+        LoginStep("press",    value="Enter"),
     ],
 )
 ```
+
+Use `"click"` instead of `"press"` if the page has a visible submit button you want to click directly.
+
 
 **Extra field example** (domain on the same page):
 

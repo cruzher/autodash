@@ -16,7 +16,7 @@ class LoginStep:
     value    : text to type (fill only); {username} and {password} are substituted
     """
     action:   str
-    selector: str
+    selector: str = ""
     value:    str = ""
 
 
