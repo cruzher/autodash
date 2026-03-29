@@ -6,29 +6,39 @@ A lightweight dashboard monitor that opens one or more web dashboards in dedicat
 
 ## Requirements
 
-- Linux (tested) or Windows
 - Python 3.9+
-- `python3-venv`
-- `xdotool` and `wmctrl` (Linux only — for window positioning)
+- Linux: `python3-venv`, `xdotool`, `wmctrl`
+- Windows: Python from [python.org](https://www.python.org/) with "Add to PATH" checked
 
-All Python dependencies are installed automatically by the bootstrap script.
+All other dependencies are installed automatically by the bootstrap script.
 
 ---
 
 ## Quick start
 
+**Linux**
 ```bash
 bash start.sh
 ```
 
-The script can be called from any working directory. It will always resolve paths relative to its own location.
+**Windows** (PowerShell)
+```powershell
+.\start.ps1
+```
 
-On first run it will:
-1. Install `xdotool` via `apt-get` if missing (Linux)
+> If PowerShell blocks the script with an execution policy error, run once:
+> `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
+
+Both scripts can be called from any working directory — paths are always resolved relative to the script's own location.
+
+On first run the script will:
+1. Install `xdotool` via `apt-get` if missing (Linux only)
 2. Create a `.venv` virtual environment
 3. Install Python dependencies from `requirements.txt`
 4. Download the Playwright Chromium browser
 5. Start the monitor
+
+Subsequent runs skip steps 3 and 4 automatically if nothing has changed.
 
 ---
 
@@ -274,5 +284,6 @@ Replace the path with the actual location of `start.sh` on your system.
 | `sample-sites.py` | Template for `sites.py` |
 | `offline.html` | Fullscreen page shown when internet is unavailable |
 | `no_schedule.html` | Fullscreen page shown when no site is currently scheduled |
-| `start.sh` | Bootstrap and launch script |
+| `start.sh` | Bootstrap and launch script (Linux) |
+| `start.ps1` | Bootstrap and launch script (Windows) |
 | `requirements.txt` | Python dependencies |
