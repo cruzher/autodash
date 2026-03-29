@@ -21,6 +21,8 @@ SITES: list[SiteConfig] = [
 
         post_login_url = "",            # navigate here after login; "" = stay on landing page
 
+        auto_login = True,              # set to False for public pages that need no login
+
         # Simple login — auto-detected selectors (works for most sites)
         username_selector = "input[type='text'], input[name='username'], input[name='email'], input[id*='user'], input[id*='email']",
         password_selector = "input[type='password']",

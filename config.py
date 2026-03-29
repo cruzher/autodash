@@ -64,6 +64,10 @@ class SiteConfig:
     extra_username_selectors: list = field(default_factory=list)
     extra_password_selectors: list = field(default_factory=list)
 
+    # ── Login control ───────────────────────────────────────────────────────
+    # Set to False for sites that do not require a login (e.g. public dashboards).
+    auto_login: bool = True
+
     # ── Multi-step / multi-field login ───────────────────────────────────────
     # When set, replaces the simple username/password/submit flow entirely.
     # Each LoginStep is one action: fill a field, click an element, or wait

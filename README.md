@@ -64,6 +64,7 @@ Edit `sites.py` and fill in one `SiteConfig` entry per dashboard. Each entry ope
 | `logged_in_url_fragment` | `""` | URL path/fragment that indicates an authenticated page |
 | `extra_username_selectors` | `[]` | Additional fallback CSS selectors for the username field |
 | `extra_password_selectors` | `[]` | Additional fallback CSS selectors for the password field |
+| `auto_login` | `True` | Set to `False` for public pages that need no login |
 
 ### 3. Multi-step and multi-field login (`login_steps`)
 
@@ -122,6 +123,22 @@ Right-click the field in the browser → **Inspect** and look at the `<input>` e
 | ARIA role + name | `role=textbox[name='Username']` |
 
 > **Note:** `textbox` is an ARIA role, not an HTML element. Use `input[...]` for standard HTML fields. The ARIA `role=` syntax is only needed when the element has an explicit `role="textbox"` attribute.
+
+---
+
+### 4. Public pages (no login)
+
+Set `auto_login = False` for sites that do not have a login form. The monitor will still open the page, keep the window alive, and refresh it on the normal schedule — it simply skips all login logic.
+
+```python
+SiteConfig(
+    name       = "Public Dashboard",
+    url        = "https://example.com/public",
+    username   = "",
+    password   = "",
+    auto_login = False,
+)
+```
 
 ---
 

@@ -710,11 +710,12 @@ class SiteMonitor:
         await asyncio.sleep(2)
         if not self.cfg.fullscreen:
             await fit_viewport_to_window(self.page)
-        if not await self.is_logged_in():
-            await self.login()
-        else:
-            self.log.info("Already logged in.")
-            await self._maybe_goto_post_login()
+        if self.cfg.auto_login:
+            if not await self.is_logged_in():
+                await self.login()
+            else:
+                self.log.info("Already logged in.")
+                await self._maybe_goto_post_login()
 
     async def _login_with_steps(self):
         subs = {"{username}": self.cfg.username, "{password}": self.cfg.password}
@@ -832,7 +833,7 @@ class SiteMonitor:
         except PlaywrightTimeoutError:
             self.log.warning("Reload timed out - continuing.")
         await asyncio.sleep(2)
-        if not await self.is_logged_in():
+        if self.cfg.auto_login and not await self.is_logged_in():
             self.log.warning("Session expired after refresh - re-logging in.")
             await self.login()
 
