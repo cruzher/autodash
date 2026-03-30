@@ -14,6 +14,7 @@ SITES: list[SiteConfig] = [
         password      = "PASSWORD",
 
         fullscreen    = False,          # True = kiosk mode (ignores position/size below)
+        zoom          = 1.0,            # browser zoom level (1.0 = 100%, 1.5 = 150%, etc.)
         window_x      = 0,
         window_y      = 0,
         window_width  = 1280,

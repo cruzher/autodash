@@ -61,6 +61,7 @@ Edit `sites.py` and fill in one `SiteConfig` entry per dashboard. Each entry ope
 | `username` | *(required)* | Login username / email |
 | `password` | *(required)* | Login password |
 | `fullscreen` | `False` | Fill entire screen (kiosk mode) |
+| `zoom` | `1.0` | Browser zoom level (`1.0` = 100 %, `1.5` = 150 %, `0.8` = 80 %, etc.) |
 | `window_x` | `0` | Window left position in pixels |
 | `window_y` | `0` | Window top position in pixels |
 | `window_width` | `1280` | Window width in pixels |

@@ -36,6 +36,9 @@ class SiteConfig:
     # Set to True to launch this window in fullscreen (kiosk-style)
     fullscreen: bool = False
 
+    # Browser zoom level (1.0 = 100 %, 1.5 = 150 %, 0.8 = 80 %, etc.)
+    zoom: float = 1.0
+
     # Optional: navigate to this URL after a successful login.
     # Leave empty to stay on whatever page the site lands on after login.
     post_login_url: str = ""
