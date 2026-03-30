@@ -236,10 +236,10 @@ def build_args(cfg):
         "--disable-background-networking",
         "--password-store=basic",
     ]
+    args.append(f"--window-position={cfg.window_x},{cfg.window_y}")
     if cfg.fullscreen:
         args.append("--start-fullscreen")
     else:
-        args.append(f"--window-position={cfg.window_x},{cfg.window_y}")
         args.append(f"--window-size={cfg.window_width},{cfg.window_height}")
     return args
 
