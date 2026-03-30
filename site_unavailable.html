@@ -59,6 +59,16 @@
       margin-bottom: 2rem;
     }
 
+    .clock {
+      font-size: 5rem;
+      font-weight: 200;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.05em;
+      color: #8b949e;
+      margin-bottom: 2rem;
+      font-family: "Segoe UI", "SF Pro Display", system-ui, monospace;
+    }
+
     .badge {
       display: inline-flex;
       align-items: center;
@@ -86,6 +96,7 @@
 </head>
 <body>
   <div class="card">
+    <div class="clock" id="clock">00:00</div>
     <div class="icon">&#x26A0;&#xFE0F;</div>
     <h1>Site Unavailable</h1>
     <div class="site-name" id="site-name"></div>
@@ -98,6 +109,12 @@
   <script>
     const name = decodeURIComponent(window.location.hash.slice(1));
     if (name) document.getElementById("site-name").textContent = name;
+    function tick() {
+      document.getElementById("clock").textContent =
+        new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+    }
+    tick();
+    setInterval(tick, 10000);
   </script>
 </body>
 </html>

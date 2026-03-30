@@ -51,6 +51,16 @@
       margin-bottom: 2rem;
     }
 
+    .clock {
+      font-size: 5rem;
+      font-weight: 200;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.05em;
+      color: #8b949e;
+      margin-bottom: 2rem;
+      font-family: "Segoe UI", "SF Pro Display", system-ui, monospace;
+    }
+
     .badge {
       display: inline-flex;
       align-items: center;
@@ -78,6 +88,7 @@
 </head>
 <body>
   <div class="card">
+    <div class="clock" id="clock">00:00</div>
     <div class="icon">&#x1F4F6;</div>
     <h1>No Internet Connection</h1>
     <p>The network is currently unreachable.<br>The dashboard will resume automatically once connectivity is restored.</p>
@@ -86,5 +97,13 @@
       Waiting for connection&hellip;
     </span>
   </div>
+  <script>
+    function tick() {
+      document.getElementById("clock").textContent =
+        new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+    }
+    tick();
+    setInterval(tick, 10000);
+  </script>
 </body>
 </html>
