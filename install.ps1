@@ -108,7 +108,7 @@ if ($answer -eq "" -or $answer -match "^[Yy]") {
         Set-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings | Out-Null
         Write-Host "[OK] Scheduled task updated."
     } else {
-        Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -RunLevel Highest | Out-Null
+        Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings | Out-Null
         Write-Host "[OK] Scheduled task created - autodash will start at next logon."
     }
 } else {
