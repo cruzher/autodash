@@ -6,31 +6,57 @@ A lightweight dashboard monitor that opens one or more web dashboards in dedicat
 
 ## Requirements
 
+- Git
 - Python 3.9+
 - Linux: `python3-venv`, `xdotool`, `wmctrl`
 - Windows: Python from [python.org](https://www.python.org/) with "Add to PATH" checked
 
-All other dependencies are installed automatically by the bootstrap script.
+All other dependencies are installed automatically by the setup script.
 
 ---
 
-## Quick start
+## Installation
+
+### 1. Install Git
+
+**Linux**
+```bash
+sudo apt install git
+```
+
+**Windows**
+```powershell
+winget install --id Git.Git -e --source winget
+```
+
+### 2. Clone the repository
+
+```bash
+git clone https://github.com/your-username/autodash.git
+cd autodash
+```
+
+### 3. Install dependencies and start
 
 **Linux** — installs dependencies and starts the monitor:
 ```bash
 bash start.sh
 ```
 
-**Windows** — run the install script once, then start the monitor manually:
+**Windows** — installs dependencies:
 ```powershell
 .\install.ps1
-.venv\Scripts\python monitor.py
 ```
 
 > If PowerShell blocks the script with an execution policy error, run once:
 > `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
 
-All scripts resolve paths relative to their own location and can be called from any working directory. On Linux, re-running `start.sh` is safe — dependency installation is skipped automatically if nothing has changed.
+Then start the monitor:
+```powershell
+.venv\Scripts\python monitor.py
+```
+
+On Linux, re-running `start.sh` is safe — dependency installation is skipped automatically if nothing has changed.
 
 ---
 
