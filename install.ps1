@@ -104,13 +104,13 @@ if ($existing) {
     Write-Host "[OK] Scheduled task updated."
 } else {
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -RunLevel Highest | Out-Null
-    Write-Host "[OK] Scheduled task created — autodash will start at logon."
+    Write-Host "[OK] Scheduled task created - autodash will start at logon."
 }
 
 Write-Host ""
 Write-Host "========================================="
 Write-Host " Setup complete."
-Write-Host " autodash will start automatically at logon."
+Write-Host " autodash will start automatically at next logon."
 Write-Host " To start now, run:"
 Write-Host "   $VenvDir\Scripts\python monitor.py"
 Write-Host "========================================="
