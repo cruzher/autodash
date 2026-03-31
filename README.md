@@ -19,7 +19,7 @@ All other dependencies are installed automatically by the setup script.
 
 ### 1. Install Git
 
-**Linux**
+**Linux (debian)**
 ```bash
 sudo apt install git
 ```
@@ -32,7 +32,7 @@ winget install --id Git.Git -e --source winget
 ### 2. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/autodash.git
+git clone https://github.com/cruzher/autodash.git
 cd autodash
 ```
 
