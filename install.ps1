@@ -89,31 +89,25 @@ if ($DepsUpdated -or -not $ChromiumInstalled) {
 }
 
 # -- Scheduled task (run monitor.py at logon) ------------------------------
-$TaskName = "autodash"
-$existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+# -- Startup registry entry (run monitor.py at logon) ----------------------
+$RegKey    = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+$RegName   = "autodash"
+$existing  = Get-ItemProperty -Path $RegKey -Name $RegName -ErrorAction SilentlyContinue
 
 if ($existing) {
-    $answer = Read-Host "A scheduled task already exists. Update it? [Y/n]"
+    $answer = Read-Host "A startup entry already exists. Update it? [Y/n]"
 } else {
-    $answer = Read-Host "Create a scheduled task to start autodash at logon? [Y/n]"
+    $answer = Read-Host "Start autodash automatically at logon? [Y/n]"
 }
 
 if ($answer -eq "" -or $answer -match "^[Yy]") {
     $PythonExe  = (Resolve-Path "$VenvDir\Scripts\python.exe").Path
     $ScriptPath = (Resolve-Path "monitor.py").Path
-    $action   = New-ScheduledTaskAction -Execute $PythonExe -Argument "`"$ScriptPath`"" -WorkingDirectory $PSScriptRoot
-    $trigger  = New-ScheduledTaskTrigger -AtLogon
-    $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0
-    if ($existing) {
-        Set-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings | Out-Null
-        Write-Host "[OK] Scheduled task updated."
-    } else {
-        $principal = New-ScheduledTaskPrincipal -UserId $env:USERDOMAIN\$env:USERNAME -LogonType Interactive
-        Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal | Out-Null
-        Write-Host "[OK] Scheduled task created - autodash will start at next logon."
-    }
+    $cmd = "`"$PythonExe`" `"$ScriptPath`""
+    Set-ItemProperty -Path $RegKey -Name $RegName -Value $cmd
+    Write-Host "[OK] Startup entry saved - autodash will start at next logon."
 } else {
-    Write-Host "[--] Scheduled task skipped."
+    Write-Host "[--] Startup entry skipped."
 }
 
 Write-Host ""
