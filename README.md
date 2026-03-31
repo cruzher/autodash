@@ -29,6 +29,11 @@ sudo apt install git
 winget install --id Git.Git -e --source winget
 ```
 
+**Windows — Visual C++ Redistributable** (required by Playwright)
+```powershell
+winget install --id Microsoft.VCRedist.2015+.x64 -e
+```
+
 ### 2. Clone the repository
 
 ```bash

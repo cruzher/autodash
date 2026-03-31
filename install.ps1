@@ -12,6 +12,20 @@ Write-Host " autodash - Setup"
 Write-Host "========================================="
 Write-Host ""
 
+# -- Visual C++ Redistributable (required by Playwright / greenlet) --------
+$VcKey = "HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\X64"
+$VcInstalled = (Test-Path $VcKey) -and ((Get-ItemProperty $VcKey -ErrorAction SilentlyContinue).Installed -eq 1)
+if (-not $VcInstalled) {
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        Write-Host "[..] Installing Visual C++ Redistributable ..."
+        winget install --id Microsoft.VCRedist.2015+.x64 -e --silent
+        Write-Host "[OK] Visual C++ Redistributable installed."
+    } else {
+        Write-Host "[WARN] Visual C++ Redistributable not found."
+        Write-Host "       Install manually: https://aka.ms/vs/17/release/vc_redist.x64.exe"
+    }
+}
+
 # -- Python ----------------------------------------------------------------
 $PythonCmd = $null
 foreach ($cmd in @("python", "python3")) {
