@@ -89,29 +89,36 @@ if ($DepsUpdated -or -not $ChromiumInstalled) {
 }
 
 # -- Scheduled task (run monitor.py at logon) ------------------------------
-$TaskName  = "autodash"
-$PythonExe = (Resolve-Path "$VenvDir\Scripts\python.exe").Path
-$ScriptPath = (Resolve-Path "monitor.py").Path
-$WorkDir   = $PSScriptRoot
-
-$action  = New-ScheduledTaskAction -Execute $PythonExe -Argument "`"$ScriptPath`"" -WorkingDirectory $WorkDir
-$trigger = New-ScheduledTaskTrigger -AtLogon
-$settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0 -RestartOnIdle $false
-
+$TaskName = "autodash"
 $existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+
 if ($existing) {
-    Set-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings | Out-Null
-    Write-Host "[OK] Scheduled task updated."
+    $answer = Read-Host "A scheduled task already exists. Update it? [Y/n]"
 } else {
-    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -RunLevel Highest | Out-Null
-    Write-Host "[OK] Scheduled task created - autodash will start at logon."
+    $answer = Read-Host "Create a scheduled task to start autodash at logon? [Y/n]"
+}
+
+if ($answer -eq "" -or $answer -match "^[Yy]") {
+    $PythonExe  = (Resolve-Path "$VenvDir\Scripts\python.exe").Path
+    $ScriptPath = (Resolve-Path "monitor.py").Path
+    $action   = New-ScheduledTaskAction -Execute $PythonExe -Argument "`"$ScriptPath`"" -WorkingDirectory $PSScriptRoot
+    $trigger  = New-ScheduledTaskTrigger -AtLogon
+    $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0
+    if ($existing) {
+        Set-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings | Out-Null
+        Write-Host "[OK] Scheduled task updated."
+    } else {
+        Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -RunLevel Highest | Out-Null
+        Write-Host "[OK] Scheduled task created - autodash will start at next logon."
+    }
+} else {
+    Write-Host "[--] Scheduled task skipped."
 }
 
 Write-Host ""
 Write-Host "========================================="
 Write-Host " Setup complete."
-Write-Host " autodash will start automatically at next logon."
-Write-Host " To start now, run:"
+Write-Host " To start the monitor, run:"
 Write-Host "   $VenvDir\Scripts\python monitor.py"
 Write-Host "========================================="
 Write-Host ""
