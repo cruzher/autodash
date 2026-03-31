@@ -88,10 +88,30 @@ if ($DepsUpdated -or -not $ChromiumInstalled) {
     Write-Host "[OK] Chromium ready."
 }
 
+# -- Scheduled task (run monitor.py at logon) ------------------------------
+$TaskName  = "autodash"
+$PythonExe = (Resolve-Path "$VenvDir\Scripts\python.exe").Path
+$ScriptPath = (Resolve-Path "monitor.py").Path
+$WorkDir   = $PSScriptRoot
+
+$action  = New-ScheduledTaskAction -Execute $PythonExe -Argument "`"$ScriptPath`"" -WorkingDirectory $WorkDir
+$trigger = New-ScheduledTaskTrigger -AtLogon
+$settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0 -RestartOnIdle $false
+
+$existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+if ($existing) {
+    Set-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings | Out-Null
+    Write-Host "[OK] Scheduled task updated."
+} else {
+    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -RunLevel Highest | Out-Null
+    Write-Host "[OK] Scheduled task created — autodash will start at logon."
+}
+
 Write-Host ""
 Write-Host "========================================="
 Write-Host " Setup complete."
-Write-Host " Run the monitor with:"
+Write-Host " autodash will start automatically at logon."
+Write-Host " To start now, run:"
 Write-Host "   $VenvDir\Scripts\python monitor.py"
 Write-Host "========================================="
 Write-Host ""
