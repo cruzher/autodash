@@ -16,29 +16,21 @@ All other dependencies are installed automatically by the bootstrap script.
 
 ## Quick start
 
-**Linux**
+**Linux** — installs dependencies and starts the monitor:
 ```bash
 bash start.sh
 ```
 
-**Windows** (PowerShell)
+**Windows** — run the install script once, then start the monitor manually:
 ```powershell
-.\start.ps1
+.\install.ps1
+.venv\Scripts\python monitor.py
 ```
 
 > If PowerShell blocks the script with an execution policy error, run once:
 > `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
 
-Both scripts can be called from any working directory — paths are always resolved relative to the script's own location.
-
-On first run the script will:
-1. Install `xdotool` via `apt-get` if missing (Linux only)
-2. Create a `.venv` virtual environment
-3. Install Python dependencies from `requirements.txt`
-4. Download the Playwright Chromium browser
-5. Start the monitor
-
-Subsequent runs skip steps 3 and 4 automatically if nothing has changed.
+All scripts resolve paths relative to their own location and can be called from any working directory. On Linux, re-running `start.sh` is safe — dependency installation is skipped automatically if nothing has changed.
 
 ---
 
@@ -76,6 +68,8 @@ Edit `sites.py` and fill in one `SiteConfig` entry per dashboard. Each entry ope
 | `extra_username_selectors` | `[]` | Additional fallback CSS selectors for the username field |
 | `extra_password_selectors` | `[]` | Additional fallback CSS selectors for the password field |
 | `auto_login` | `True` | Set to `False` for public pages that need no login |
+| `availability_check` | `True` | Set to `False` to skip availability checking for this site |
+| `availability_check_selector` | `""` | CSS selector verified via headless browser before opening (more reliable than HTTP for JS-heavy sites); leave empty to use HTTP check only |
 
 ### 3. Multi-step and multi-field login (`login_steps`)
 
@@ -290,5 +284,5 @@ Replace the path with the actual location of `start.sh` on your system.
 | `offline.html` | Fullscreen page shown when internet is unavailable |
 | `no_schedule.html` | Fullscreen page shown when no site is currently scheduled |
 | `start.sh` | Bootstrap and launch script (Linux) |
-| `start.ps1` | Bootstrap and launch script (Windows) |
+| `install.ps1` | Dependency install script (Windows) |
 | `requirements.txt` | Python dependencies |

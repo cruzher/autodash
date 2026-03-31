@@ -78,11 +78,14 @@ class SiteConfig:
     login_steps: list = field(default_factory=list)
 
     # ── Availability check ───────────────────────────────────────────────────
+    # Set to False to disable availability checking entirely for this site.
+    availability_check: bool = True
+
     # If set, a headless Playwright session navigates to the URL and checks
     # whether this CSS selector exists in the fully-rendered page.  More
     # reliable than a plain HTTP check because JavaScript is executed,
     # so dynamic/SPA content is visible.
-    # Leave empty to skip (default).
+    # Leave empty to use a plain HTTP check only (default).
     # Example: availability_check_selector = "#login-form"
     # Example: availability_check_selector = ".dashboard-header"
     availability_check_selector: str = ""

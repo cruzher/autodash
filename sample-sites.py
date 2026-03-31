@@ -42,7 +42,8 @@ SITES: list[SiteConfig] = [
         logged_in_selector     = "",   # CSS selector present only when logged in
         logged_in_url_fragment = "",   # URL fragment present only when logged in
 
-        availability_check_selector = "",  # CSS selector checked via headless browser before opening; e.g. "#login-form"
+        availability_check          = True, # set to False to skip availability checking entirely
+        availability_check_selector = "",   # CSS selector checked via headless browser before opening; e.g. "#login-form"
 
         schedule = [],   # always active; see README.md § Scheduling for time-window syntax
         # schedule = [("Mon-Fri", "09:00", "17:00")],

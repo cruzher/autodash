@@ -689,7 +689,7 @@ class SiteMonitor:
         await self._launch_context()
         if not await check_internet():
             await self._show_offline_page()
-        elif not (
+        elif self.cfg.availability_check and not (
             await check_site_available(self.cfg.url)
             and await self._playwright_availability_check()
         ):
@@ -884,7 +884,7 @@ class SiteMonitor:
                     self._seconds_since_pos_check = 0
                     continue
 
-                available = (
+                available = not self.cfg.availability_check or (
                     await check_site_available(self.cfg.url)
                     and await self._playwright_availability_check()
                 )

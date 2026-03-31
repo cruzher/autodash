@@ -1,14 +1,14 @@
-# start.ps1 - Bootstrap and launch script for Windows
+# install.ps1 - One-time setup script for autodash (Windows)
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
-$VenvDir     = ".venv"
+$VenvDir      = ".venv"
 $Requirements = "requirements.txt"
-$HashFile    = "$VenvDir\.requirements-hash"
+$HashFile     = "$VenvDir\.requirements-hash"
 
 Write-Host ""
 Write-Host "========================================="
-Write-Host " autodash"
+Write-Host " autodash - Setup"
 Write-Host "========================================="
 Write-Host ""
 
@@ -74,19 +74,10 @@ if ($DepsUpdated -or -not $ChromiumInstalled) {
     Write-Host "[OK] Chromium ready."
 }
 
-# -- Start -----------------------------------------------------------------
 Write-Host ""
 Write-Host "========================================="
-Write-Host " Starting monitor ..."
-Write-Host " Press Ctrl+C to stop."
+Write-Host " Setup complete."
+Write-Host " Run the monitor with:"
+Write-Host "   $VenvDir\Scripts\python monitor.py"
 Write-Host "========================================="
 Write-Host ""
-
-python monitor.py
-$ExitCode = $LASTEXITCODE
-
-if ($ExitCode -ne 0) {
-    Write-Host ""
-    Write-Host "[ERROR] monitor.py exited with code $ExitCode."
-    exit $ExitCode
-}
