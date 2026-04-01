@@ -316,4 +316,5 @@ Replace the path with the actual location of `start.sh` on your system.
 | `no_schedule.html` | Fullscreen page shown when no site is currently scheduled |
 | `start.sh` | Bootstrap and launch script (Linux) |
 | `install.ps1` | Dependency install script (Windows) |
+| `uninstall.ps1` | Remove startup entry and virtual environment (Windows) |
 | `requirements.txt` | Python dependencies |

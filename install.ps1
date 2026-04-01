@@ -66,6 +66,9 @@ if ($CurrentHash -ne $StoredHash) {
     Write-Host "[..] Installing Python dependencies ..."
     pip install --upgrade pip --quiet
     if (Test-Path $Requirements) {
+        # Read as UTF-8 and write back as ASCII to guard against encoding issues
+        $content = Get-Content $Requirements -Encoding UTF8
+        [System.IO.File]::WriteAllLines((Resolve-Path $Requirements).Path, $content, [System.Text.UTF8Encoding]::new($false))
         pip install -r $Requirements --quiet
     } else {
         pip install playwright --quiet
