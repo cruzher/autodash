@@ -4,6 +4,8 @@ config.py - SiteConfig dataclass definition
 Imported by both sites.py (for configuration) and monitor.py (for type hints).
 """
 
+import json
+import pathlib
 from dataclasses import dataclass, field
 
 
@@ -101,3 +103,22 @@ class SiteConfig:
     #   schedule = [("Mon-Fri", "08:00", "18:00"), ("Sat", "08:00", "13:00")]
     #   schedule = [("09:00", "17:00")]        # every day, 9 to 5
     schedule: list = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# JSON serialisation helpers
+# ---------------------------------------------------------------------------
+
+def load_sites_json(path) -> list:
+    """Load SITES from a JSON file and return list[SiteConfig]."""
+    data = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
+    sites = []
+    for s in data:
+        s = dict(s)
+        steps = [LoginStep(**step) for step in s.pop("login_steps", [])]
+        # schedule entries are stored as lists in JSON; convert back to tuples
+        schedule = [tuple(entry) for entry in s.pop("schedule", [])]
+        sites.append(SiteConfig(**s, login_steps=steps, schedule=schedule))
+    return sites
+
+

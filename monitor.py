@@ -4,7 +4,6 @@ monitor.py - Multi-Site Auto-Login Monitor using Playwright (Chromium)
 
 import asyncio
 import datetime
-import importlib.util
 import json
 import logging
 import os
@@ -25,8 +24,11 @@ from playwright.async_api import (
     TimeoutError as PlaywrightTimeoutError,
 )
 
-from config import SiteConfig
-from sites import SITES
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, JSONResponse
+import uvicorn
+
+from config import SiteConfig, load_sites_json
 
 # ---- TIMING CONFIGURATION -----------------------------------------------
 
@@ -53,15 +55,45 @@ _NO_SCHEDULE_URL            = _NO_SCHEDULE_HTML_PATH.as_uri()
 _SITE_UNAVAILABLE_HTML_PATH = Path(__file__).parent / "site_unavailable.html"
 _SITE_UNAVAILABLE_URL       = _SITE_UNAVAILABLE_HTML_PATH.as_uri()
 
-_SITES_PATH = Path(__file__).parent / "sites.py"
+_SITES_JSON_PATH = Path(__file__).parent / "sites.json"
+_UI_HTML_PATH    = Path(__file__).parent / "ui.html"
+
+WEB_PORT = int(os.environ.get("WEB_PORT", 8080))
 
 
 def _load_sites() -> list:
-    """Reload sites.py from disk and return its SITES list."""
-    spec = importlib.util.spec_from_file_location("sites_hot", _SITES_PATH)
-    mod  = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod.SITES
+    """Reload sites.json from disk and return list[SiteConfig]."""
+    if not _SITES_JSON_PATH.exists():
+        return []
+    return load_sites_json(_SITES_JSON_PATH)
+
+
+# ---- WEB CONFIG API ---------------------------------------------------------
+
+api = FastAPI(title="autodash config")
+
+
+@api.get("/sites")
+def api_get_sites():
+    if not _SITES_JSON_PATH.exists():
+        return JSONResponse(content=[])
+    data = json.loads(_SITES_JSON_PATH.read_text(encoding="utf-8"))
+    return JSONResponse(content=data)
+
+
+@api.put("/sites")
+async def api_put_sites(request: Request):
+    body = await request.json()
+    _SITES_JSON_PATH.write_text(
+        json.dumps(body, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return {"ok": True}
+
+
+@api.get("/ui", include_in_schema=False)
+def api_serve_ui():
+    return FileResponse(_UI_HTML_PATH)
 
 
 async def check_site_available(url: str) -> bool:
@@ -780,13 +812,13 @@ class SiteMonitor:
                 [self.cfg.username_selector] + self.cfg.extra_username_selectors
             )
             if username_field is None:
-                self.log.error("Username field not found - check username_selector in sites.py.")
+                self.log.error("Username field not found - check username_selector in the config UI.")
                 return
             password_field = await self._find_element(
                 [self.cfg.password_selector] + self.cfg.extra_password_selectors
             )
             if password_field is None:
-                self.log.error("Password field not found - check password_selector in sites.py.")
+                self.log.error("Password field not found - check password_selector in the config UI.")
                 return
             await username_field.click()
             await username_field.fill(self.cfg.username)
@@ -807,7 +839,7 @@ class SiteMonitor:
             self.log.info("Login successful.")
             await self._maybe_goto_post_login()
         else:
-            self.log.warning("Login may have failed - check credentials/selectors in sites.py.")
+            self.log.warning("Login may have failed - check credentials/selectors in the config UI.")
 
     async def _maybe_goto_post_login(self):
         if not self.cfg.post_login_url:
@@ -958,7 +990,7 @@ async def schedule_coordinator(monitors, pw):
 
     active_tasks = {}          # SiteMonitor -> asyncio.Task
     was_active   = {m: None for m in monitors}   # None = first tick not yet run
-    sites_mtime  = _SITES_PATH.stat().st_mtime if _SITES_PATH.exists() else 0.0
+    sites_mtime  = _SITES_JSON_PATH.stat().st_mtime if _SITES_JSON_PATH.exists() else 0.0
 
     # Notice window state (managed as a bare context, not a SiteMonitor)
     notice_context = None
@@ -1065,9 +1097,9 @@ async def schedule_coordinator(monitors, pw):
         else:
             await _open_notice()
 
-        # ── Hot-reload sites.py ───────────────────────────────────────────
+        # ── Hot-reload sites.json ─────────────────────────────────────────
         try:
-            mtime = _SITES_PATH.stat().st_mtime
+            mtime = _SITES_JSON_PATH.stat().st_mtime
         except OSError:
             mtime = sites_mtime
 
@@ -1075,9 +1107,9 @@ async def schedule_coordinator(monitors, pw):
             sites_mtime = mtime
             try:
                 new_cfgs = _load_sites()
-                log.info("sites.py changed — reconciling monitors.")
+                log.info("sites.json changed — reconciling monitors.")
             except Exception as exc:
-                log.error("Failed to reload sites.py: %s", exc)
+                log.error("Failed to reload sites.json: %s", exc)
                 new_cfgs = None
 
             if new_cfgs is not None:
@@ -1099,20 +1131,20 @@ async def schedule_coordinator(monitors, pw):
                 # Remove sites no longer present
                 for name, m in list(old_by_name.items()):
                     if name not in new_by_name:
-                        log.info("sites.py: removing '%s'.", name)
+                        log.info("config: removing '%s'.", name)
                         await _stop_monitor(m)
 
                 # Add new sites / restart changed sites
                 for cfg in new_cfgs:
                     existing = old_by_name.get(cfg.name)
                     if existing is None:
-                        log.info("sites.py: adding '%s'.", cfg.name)
+                        log.info("config: adding '%s'.", cfg.name)
                         profile_dir = Path(tempfile.mkdtemp(prefix=f"pw_profile_{cfg.name}_"))
                         m = SiteMonitor(cfg, pw, profile_dir)
                         monitors.append(m)
                         was_active[m] = None
                     elif existing.cfg != cfg:
-                        log.info("sites.py: config changed for '%s', restarting.", cfg.name)
+                        log.info("config: changed for '%s', restarting.", cfg.name)
                         await _stop_monitor(existing)
                         profile_dir = Path(tempfile.mkdtemp(prefix=f"pw_profile_{cfg.name}_"))
                         m = SiteMonitor(cfg, pw, profile_dir)
@@ -1137,19 +1169,26 @@ async def display_keepalive():
 
 async def main():
     disable_display_sleep()
+    initial_sites = _load_sites()
     profile_dirs = [
         Path(tempfile.mkdtemp(prefix=f"pw_profile_{i}_"))
-        for i in range(len(SITES))
+        for i in range(len(initial_sites))
     ]
     async with async_playwright() as pw:
         monitors = [
             SiteMonitor(cfg, pw, profile_dirs[i])
-            for i, cfg in enumerate(SITES)
+            for i, cfg in enumerate(initial_sites)
         ]
         coordinator = asyncio.create_task(
             schedule_coordinator(monitors, pw), name="coordinator"
         )
         keepalive = asyncio.create_task(display_keepalive(), name="keepalive")
+        web_config = uvicorn.Config(
+            api, host="0.0.0.0", port=WEB_PORT, log_level="warning"
+        )
+        web_server = uvicorn.Server(web_config)
+        web_task   = asyncio.create_task(web_server.serve(), name="webui")
+        logging.info("Config UI available at http://0.0.0.0:%d/ui", WEB_PORT)
         try:
             await coordinator
         except asyncio.CancelledError:
@@ -1158,6 +1197,8 @@ async def main():
             logging.info("Shutting down ...")
             coordinator.cancel()
             keepalive.cancel()
+            web_server.should_exit = True
+            web_task.cancel()
             for m in monitors:
                 try:
                     if m.context:

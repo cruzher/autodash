@@ -67,15 +67,20 @@ On Linux, re-running `start.sh` is safe — dependency installation is skipped a
 
 ## Configuration
 
-### 1. Copy the sample and edit it
+### 1. Start the monitor and open the UI
 
-```bash
-cp sample-sites.py sites.py
+```
+http://<machine-ip>:8080/ui
 ```
 
-Edit `sites.py` and fill in one `SiteConfig` entry per dashboard. Each entry opens one browser window.
+Add one entry per dashboard. Each entry opens one browser window. Changes are saved to `sites.json` and picked up automatically within 60 seconds — no restart needed.
 
-### 2. `SiteConfig` fields
+> The port defaults to `8080`. Override with the `WEB_PORT` environment variable:
+> ```
+> WEB_PORT=9090 python monitor.py
+> ```
+
+### 2. Field reference
 
 | Field | Default | Description |
 |---|---|---|
@@ -106,13 +111,7 @@ Edit `sites.py` and fill in one `SiteConfig` entry per dashboard. Each entry ope
 
 Some sites show the username and password on separate pages (e.g. Microsoft, Google, many SSO portals), or include extra fields such as a domain or PIN. Use `login_steps` for these cases. When set it replaces the simple `username_selector` / `password_selector` / `submit_selector` flow entirely.
 
-Import `LoginStep` alongside `SiteConfig`:
-
-```python
-from config import SiteConfig, LoginStep
-```
-
-Each `LoginStep` takes an **action**, a **CSS selector**, and an optional **value**:
+Each step has an **action**, a **CSS selector**, and an optional **value**:
 
 | Action | Behaviour |
 |---|---|
@@ -123,32 +122,24 @@ Each `LoginStep` takes an **action**, a **CSS selector**, and an optional **valu
 
 **Multi-step example** (username page → Next → password page → Sign in):
 
-```python
-SiteConfig(
-    ...
-    login_steps = [
-        LoginStep("fill",     "input[name='loginfmt']", "{username}"),
-        LoginStep("press",    value="Enter"),
-        LoginStep("wait_for", "input[type='password']"),
-        LoginStep("fill",     "input[type='password']", "{password}"),
-        LoginStep("press",    value="Enter"),
-    ],
-)
-```
+| Action | Selector | Value |
+|---|---|---|
+| `fill` | `input[name='loginfmt']` | `{username}` |
+| `press` | *(empty)* | `Enter` |
+| `wait_for` | `input[type='password']` | |
+| `fill` | `input[type='password']` | `{password}` |
+| `press` | *(empty)* | `Enter` |
 
 Use `"click"` instead of `"press"` if the page has a visible submit button you want to click directly.
 
-
 **Extra field example** (domain on the same page):
 
-```python
-login_steps = [
-    LoginStep("fill",  "input[name='username']", "{username}"),
-    LoginStep("fill",  "input[type='password']", "{password}"),
-    LoginStep("fill",  "input[name='domain']",   "CORP"),
-    LoginStep("click", "button[type='submit']"),
-]
-```
+| Action | Selector | Value |
+|---|---|---|
+| `fill` | `input[name='username']` | `{username}` |
+| `fill` | `input[type='password']` | `{password}` |
+| `fill` | `input[name='domain']` | `CORP` |
+| `click` | `button[type='submit']` | |
 
 #### Finding the right selector
 
@@ -166,48 +157,9 @@ Right-click the field in the browser → **Inspect** and look at the `<input>` e
 
 ---
 
-### 4. Public pages (no login)
+### 3. Public pages (no login)
 
-Set `auto_login = False` for sites that do not have a login form. The monitor will still open the page, keep the window alive, and refresh it on the normal schedule — it simply skips all login logic.
-
-```python
-SiteConfig(
-    name       = "Public Dashboard",
-    url        = "https://example.com/public",
-    username   = "",
-    password   = "",
-    auto_login = False,
-)
-```
-
----
-
-### 5. Example with two windows side by side
-
-```python
-from config import SiteConfig
-
-SITES = [
-    SiteConfig(
-        name     = "Grafana",
-        url      = "https://grafana.example.com/login",
-        username = "admin",
-        password = "secret",
-        window_x = 0, window_y = 0,
-        window_width = 960, window_height = 1080,
-        logged_in_url_fragment = "/d/",
-    ),
-    SiteConfig(
-        name     = "Home Assistant",
-        url      = "https://ha.example.com",
-        username = "admin",
-        password = "secret",
-        window_x = 960, window_y = 0,
-        window_width = 960, window_height = 1080,
-        logged_in_selector = ".toolbar-title",
-    ),
-]
-```
+Set `auto_login` to `false` for sites that do not have a login form. The monitor will still open the page, keep the window alive, and refresh it — it simply skips all login logic.
 
 ---
 
@@ -309,9 +261,9 @@ Replace the path with the actual location of `start.sh` on your system.
 | File | Purpose |
 |---|---|
 | `monitor.py` | Main monitor — browser management, login, session keeping |
-| `config.py` | `SiteConfig` dataclass definition |
-| `sites.py` | Your site list (created from `sample-sites.py`) |
-| `sample-sites.py` | Template for `sites.py` |
+| `config.py` | `SiteConfig` dataclass definition and JSON helpers |
+| `sites.json` | Your site list — managed via the web UI (auto-created on first save) |
+| `ui.html` | Web-based configuration editor (served at `/ui`) |
 | `offline.html` | Fullscreen page shown when internet is unavailable |
 | `no_schedule.html` | Fullscreen page shown when no site is currently scheduled |
 | `start.sh` | Bootstrap and launch script (Linux) |

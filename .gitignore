@@ -2,7 +2,7 @@
 .venv/
 
 # Site configuration (contains credentials)
-sites.py
+sites.json
 
 # Python cache
 __pycache__/
