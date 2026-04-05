@@ -24,10 +24,20 @@ from playwright.async_api import (
     TimeoutError as PlaywrightTimeoutError,
 )
 
-from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import Depends, FastAPI, Form, Request
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 import uvicorn
 
+from auth import (
+    SESSION_TTL,
+    check_credentials,
+    create_session,
+    create_user,
+    invalidate_session,
+    require_auth,
+    user_exists,
+    validate_session,
+)
 from config import SiteConfig, load_sites_json
 
 # ---- TIMING CONFIGURATION -----------------------------------------------
@@ -58,6 +68,7 @@ _SITE_UNAVAILABLE_URL       = _SITE_UNAVAILABLE_HTML_PATH.as_uri()
 _SITES_JSON_PATH    = Path(__file__).parent / "sites.json"
 _SETTINGS_JSON_PATH = Path(__file__).parent / "settings.json"
 _UI_HTML_PATH       = Path(__file__).parent / "ui.html"
+_LOGIN_HTML_PATH    = Path(__file__).parent / "login.html"
 _LOG_DIR  = Path(__file__).parent / "logs"
 _LOG_DIR.mkdir(exist_ok=True)
 _LOG_PATH = _LOG_DIR / "autodash.log"
@@ -78,7 +89,7 @@ api = FastAPI(title="autodash config")
 
 
 @api.get("/sites")
-def api_get_sites():
+def api_get_sites(_: None = Depends(require_auth)):
     if not _SITES_JSON_PATH.exists():
         return JSONResponse(content=[])
     data = json.loads(_SITES_JSON_PATH.read_text(encoding="utf-8"))
@@ -86,7 +97,7 @@ def api_get_sites():
 
 
 @api.put("/sites")
-async def api_put_sites(request: Request):
+async def api_put_sites(request: Request, _: None = Depends(require_auth)):
     body = await request.json()
     _SITES_JSON_PATH.write_text(
         json.dumps(body, indent=2, ensure_ascii=False),
@@ -117,12 +128,12 @@ def _apply_settings(s: dict) -> None:
 
 
 @api.get("/settings")
-def api_get_settings():
+def api_get_settings(_: None = Depends(require_auth)):
     return JSONResponse(content=_load_settings())
 
 
 @api.put("/settings")
-async def api_put_settings(request: Request):
+async def api_put_settings(request: Request, _: None = Depends(require_auth)):
     body = await request.json()
     _apply_settings(body)
     _SETTINGS_JSON_PATH.write_text(
@@ -133,7 +144,7 @@ async def api_put_settings(request: Request):
 
 
 @api.get("/logs")
-def api_get_logs(lines: int = 500):
+def api_get_logs(lines: int = 500, _: None = Depends(require_auth)):
     if not _LOG_PATH.exists():
         return JSONResponse(content={"lines": []})
     with open(_LOG_PATH, encoding="utf-8", errors="replace") as f:
@@ -142,8 +153,63 @@ def api_get_logs(lines: int = 500):
 
 
 @api.get("/ui", include_in_schema=False)
-def api_serve_ui():
+def api_serve_ui(request: Request):
+    if not validate_session(request.cookies.get("session")):
+        return RedirectResponse("/login")
     return FileResponse(_UI_HTML_PATH)
+
+
+@api.get("/login", include_in_schema=False)
+def api_serve_login(request: Request):
+    # Already logged in — go straight to UI
+    if validate_session(request.cookies.get("session")):
+        return RedirectResponse("/ui")
+    # No user created yet — redirect to first-run setup (avoid loop if already on setup URL)
+    if not user_exists() and "setup" not in request.query_params:
+        return RedirectResponse("/login?setup=1")
+    return FileResponse(_LOGIN_HTML_PATH)
+
+
+@api.post("/auth/login", include_in_schema=False)
+async def api_auth_login(
+    username: str = Form(...),
+    password: str = Form(...),
+):
+    if not username or not password:
+        return RedirectResponse("/login?error=empty", status_code=303)
+    if not check_credentials(username, password):
+        return RedirectResponse("/login?error=invalid", status_code=303)
+    token = create_session()
+    response = RedirectResponse("/ui", status_code=303)
+    response.set_cookie("session", token, httponly=True, samesite="lax", max_age=SESSION_TTL)
+    return response
+
+
+@api.post("/auth/setup", include_in_schema=False)
+async def api_auth_setup(
+    username: str = Form(...),
+    password: str = Form(...),
+    password2: str = Form(...),
+):
+    if user_exists():
+        return RedirectResponse("/login?error=exists", status_code=303)
+    if not username or not password:
+        return RedirectResponse("/login?setup=1&error=empty", status_code=303)
+    if password != password2:
+        return RedirectResponse("/login?setup=1&error=mismatch", status_code=303)
+    create_user(username, password)
+    token = create_session()
+    response = RedirectResponse("/ui", status_code=303)
+    response.set_cookie("session", token, httponly=True, samesite="lax", max_age=SESSION_TTL)
+    return response
+
+
+@api.post("/auth/logout", include_in_schema=False)
+async def api_auth_logout(request: Request):
+    invalidate_session(request.cookies.get("session"))
+    response = RedirectResponse("/login", status_code=303)
+    response.delete_cookie("session")
+    return response
 
 
 async def check_site_available(url: str) -> bool:

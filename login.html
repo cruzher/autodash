@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>autodash – sign in</title>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; font-size: 14px; background: #f3f4f6;
+         color: #111827; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+
+  .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+          padding: 32px 36px; width: 100%; max-width: 360px; }
+
+  .brand { text-align: center; margin-bottom: 28px; }
+  .brand h1 { font-size: 22px; font-weight: 700; color: #111827; letter-spacing: -.01em; }
+  .brand p  { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+  .field label { font-size: 12px; color: #6b7280; font-weight: 500; }
+  .field input { background: #fff; border: 1px solid #d1d5db; border-radius: 6px;
+                 padding: 8px 10px; color: #111827; font-size: 13px; width: 100%; }
+  .field input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px #bfdbfe; }
+
+  .btn-primary { width: 100%; padding: 9px 16px; background: #2563eb; color: #fff; border: none;
+                 border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; margin-top: 6px; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-primary:disabled { background: #bfdbfe; cursor: default; }
+
+  .error { background: #fee2e2; border: 1px solid #fca5a5; border-radius: 6px;
+           padding: 8px 12px; color: #dc2626; font-size: 13px; margin-bottom: 14px; }
+  .hint { font-size: 12px; color: #9ca3af; text-align: center; margin-top: 18px; line-height: 1.5; }
+</style>
+</head>
+<body x-data="loginApp()" x-init="init()">
+
+<div class="card">
+  <div class="brand">
+    <h1>Autodash</h1>
+    <p x-text="setup ? 'Create your account' : 'Sign in to continue'"></p>
+  </div>
+
+  <div class="error" x-show="errorMsg" x-text="errorMsg"></div>
+
+  <form :action="setup ? '/auth/setup' : '/auth/login'" method="post">
+    <div class="field">
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" autocomplete="username" required autofocus>
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+    </div>
+    <div class="field" x-show="setup">
+      <label for="password2">Confirm password</label>
+      <input id="password2" name="password2" type="password" autocomplete="new-password"
+             :required="setup" @input="checkMatch($event)">
+    </div>
+    <button class="btn-primary" type="submit" x-text="setup ? 'Create account' : 'Sign in'"></button>
+  </form>
+
+  <p class="hint" x-show="setup">
+    This is the only account for this instance.<br>You can change credentials later in settings.
+  </p>
+</div>
+
+<script>
+function loginApp() {
+  return {
+    setup: false,
+    errorMsg: "",
+
+    init() {
+      const params = new URLSearchParams(location.search);
+      this.setup = params.has("setup");
+      const err = params.get("error");
+      if (err === "invalid")   this.errorMsg = "Invalid username or password.";
+      if (err === "exists")    this.errorMsg = "An account already exists.";
+      if (err === "mismatch")  this.errorMsg = "Passwords do not match.";
+      if (err === "empty")     this.errorMsg = "Username and password are required.";
+    },
+
+    checkMatch(e) {
+      const pw = document.getElementById("password").value;
+      e.target.setCustomValidity(e.target.value && e.target.value !== pw ? "Passwords do not match" : "");
+    },
+  };
+}
+</script>
+</body>
+</html>

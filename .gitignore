@@ -4,6 +4,7 @@
 # Site configuration (contains credentials)
 sites.json
 settings.json
+auth.json
 
 # Runtime logs
 logs/

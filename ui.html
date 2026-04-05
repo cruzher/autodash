@@ -15,6 +15,11 @@
   .sidebar-brand { padding: 20px 18px 16px; border-bottom: 1px solid #e5e7eb; }
   .sidebar-brand h1 { font-size: 17px; font-weight: 700; color: #111827; letter-spacing: -.01em; }
   .sidebar-brand p { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+  .sidebar-footer { padding: 12px 10px; border-top: 1px solid #e5e7eb; margin-top: auto; }
+  .signout-btn { display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 10px;
+                 border: none; background: none; border-radius: 6px; font-size: 13px; font-weight: 500;
+                 color: #6b7280; cursor: pointer; text-align: left; }
+  .signout-btn:hover { background: #fee2e2; color: #dc2626; }
   .sidebar-nav { padding: 10px 10px; flex: 1; }
   .nav-btn { display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 10px;
              border: none; background: none; border-radius: 6px; font-size: 13px; font-weight: 500;
@@ -145,6 +150,16 @@
       Logs
     </button>
   </nav>
+  <div class="sidebar-footer">
+    <button class="signout-btn" @click="signOut()">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+      Sign out
+    </button>
+  </div>
 </aside>
 
 <!-- Main -->
@@ -380,6 +395,12 @@ function defaultSite() {
   };
 }
 
+async function apiFetch(url, opts = {}) {
+  const res = await fetch(url, opts);
+  if (res.status === 401) { location.href = "/login"; return null; }
+  return res;
+}
+
 function app() {
   return {
     page: "sites",
@@ -399,7 +420,8 @@ function app() {
 
     async init() {
       try {
-        const res = await fetch("/sites");
+        const res = await apiFetch("/sites");
+        if (!res) return;
         const data = await res.json();
         this.sites = data.map(s => ({ _open: false, ...s }));
         if (this.sites.length) this.sites[0]._open = true;
@@ -408,9 +430,14 @@ function app() {
         this.setStatus("Failed to load", "err");
       }
       try {
-        const res = await fetch("/settings");
-        this.settings = await res.json();
+        const res = await apiFetch("/settings");
+        if (res) this.settings = await res.json();
       } catch(e) { /* use defaults */ }
+    },
+
+    async signOut() {
+      await fetch("/auth/logout", { method: "POST" });
+      location.href = "/login";
     },
 
     addSite() {
@@ -434,11 +461,12 @@ function app() {
       this.setStatus("Saving...", "");
       const payload = this.sites.map(({ _open, ...s }) => s);
       try {
-        const res = await fetch("/sites", {
+        const res = await apiFetch("/sites", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
+        if (!res) return;
         if (!res.ok) throw new Error(await res.text());
         this.setStatus("Saved", "ok");
       } catch(e) {
@@ -455,7 +483,8 @@ function app() {
 
     async fetchLogs() {
       try {
-        const res = await fetch("/logs?lines=500");
+        const res = await apiFetch("/logs?lines=500");
+        if (!res) return;
         const data = await res.json();
         this.logLines = data.lines || [];
         this.logUpdated = "Updated " + new Date().toLocaleTimeString();
@@ -486,11 +515,12 @@ function app() {
       this.settingsStatusMsg = "Saving...";
       this.settingsStatusClass = "";
       try {
-        const res = await fetch("/settings", {
+        const res = await apiFetch("/settings", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(this.settings),
         });
+        if (!res) return;
         if (!res.ok) throw new Error(await res.text());
         this.settingsStatusMsg = "Saved";
         this.settingsStatusClass = "ok";
