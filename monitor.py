@@ -32,7 +32,7 @@ from config import SiteConfig, load_sites_json
 
 # ---- TIMING CONFIGURATION -----------------------------------------------
 
-REFRESH_INTERVAL_SECONDS  = 600
+REFRESH_INTERVAL_SECONDS  = 600   # mutable — updated by settings API at runtime
 CHECK_INTERVAL_SECONDS    = 30
 RECONNECT_DELAY_SECONDS   = 5
 POSITION_CHECK_SECONDS    = 10
@@ -55,8 +55,12 @@ _NO_SCHEDULE_URL            = _NO_SCHEDULE_HTML_PATH.as_uri()
 _SITE_UNAVAILABLE_HTML_PATH = Path(__file__).parent / "site_unavailable.html"
 _SITE_UNAVAILABLE_URL       = _SITE_UNAVAILABLE_HTML_PATH.as_uri()
 
-_SITES_JSON_PATH = Path(__file__).parent / "sites.json"
-_UI_HTML_PATH    = Path(__file__).parent / "ui.html"
+_SITES_JSON_PATH    = Path(__file__).parent / "sites.json"
+_SETTINGS_JSON_PATH = Path(__file__).parent / "settings.json"
+_UI_HTML_PATH       = Path(__file__).parent / "ui.html"
+_LOG_DIR  = Path(__file__).parent / "logs"
+_LOG_DIR.mkdir(exist_ok=True)
+_LOG_PATH = _LOG_DIR / "autodash.log"
 
 WEB_PORT = int(os.environ.get("WEB_PORT", 8080))
 
@@ -89,6 +93,52 @@ async def api_put_sites(request: Request):
         encoding="utf-8",
     )
     return {"ok": True}
+
+
+_DEFAULT_SETTINGS = {"refresh_interval": 600, "sleep_when_idle": True}
+
+
+def _load_settings() -> dict:
+    if not _SETTINGS_JSON_PATH.exists():
+        return dict(_DEFAULT_SETTINGS)
+    try:
+        return {**_DEFAULT_SETTINGS, **json.loads(_SETTINGS_JSON_PATH.read_text(encoding="utf-8"))}
+    except Exception:
+        return dict(_DEFAULT_SETTINGS)
+
+
+_sleep_when_idle = True
+
+
+def _apply_settings(s: dict) -> None:
+    global REFRESH_INTERVAL_SECONDS, _sleep_when_idle
+    REFRESH_INTERVAL_SECONDS = max(60, int(s.get("refresh_interval", 600)))
+    _sleep_when_idle = bool(s.get("sleep_when_idle", True))
+
+
+@api.get("/settings")
+def api_get_settings():
+    return JSONResponse(content=_load_settings())
+
+
+@api.put("/settings")
+async def api_put_settings(request: Request):
+    body = await request.json()
+    _apply_settings(body)
+    _SETTINGS_JSON_PATH.write_text(
+        json.dumps(body, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return {"ok": True}
+
+
+@api.get("/logs")
+def api_get_logs(lines: int = 500):
+    if not _LOG_PATH.exists():
+        return JSONResponse(content={"lines": []})
+    with open(_LOG_PATH, encoding="utf-8", errors="replace") as f:
+        all_lines = f.readlines()
+    return JSONResponse(content={"lines": [l.rstrip("\n") for l in all_lines[-lines:]]})
 
 
 @api.get("/ui", include_in_schema=False)
@@ -145,11 +195,22 @@ async def check_internet() -> bool:
 
 # ---- LOGGING ------------------------------------------------------------
 
+import logging.handlers as _log_handlers
+
+_LOG_FORMAT = "%(asctime)s  [%(levelname)s]  %(name)s  - %(message)s"
+_LOG_DATEFMT = "%Y-%m-%d %H:%M:%S"
+
 logging.basicConfig(
     level  = logging.INFO,
-    format = "%(asctime)s  [%(levelname)s]  %(name)s  - %(message)s",
-    datefmt= "%Y-%m-%d %H:%M:%S",
+    format = _LOG_FORMAT,
+    datefmt= _LOG_DATEFMT,
 )
+
+_file_handler = _log_handlers.RotatingFileHandler(
+    _LOG_PATH, maxBytes=2 * 1024 * 1024, backupCount=3, encoding="utf-8"
+)
+_file_handler.setFormatter(logging.Formatter(_LOG_FORMAT, datefmt=_LOG_DATEFMT))
+logging.getLogger().addHandler(_file_handler)
 
 IS_LINUX    = platform.system() == "Linux"
 HAS_XDOTOOL = IS_LINUX and shutil.which("xdotool") is not None
@@ -672,8 +733,8 @@ class SiteMonitor:
     async def _playwright_availability_check(self) -> bool:
         """Launch a temporary headless browser, navigate to the site URL, and
         verify that availability_check_selector exists in the rendered DOM.
-        Returns True immediately if no selector is configured."""
-        if not self.cfg.availability_check_selector:
+        Skipped when mode is 'http' or no selector is configured."""
+        if self.cfg.availability_check_mode != "selector" or not self.cfg.availability_check_selector:
             return True
         browser = None
         try:
@@ -1011,7 +1072,8 @@ async def schedule_coordinator(monitors, pw):
             notice_context = None
 
         log.info("No monitors active — showing 'No dashboard scheduled' notice.")
-        enable_display_sleep()
+        if _sleep_when_idle:
+            enable_display_sleep()
         launch_env = {"DISPLAY": os.environ.get("DISPLAY", ":0")} if IS_LINUX else {}
         try:
             notice_context = await pw.chromium.launch_persistent_context(
@@ -1169,6 +1231,7 @@ async def display_keepalive():
 
 async def main():
     disable_display_sleep()
+    _apply_settings(_load_settings())
     initial_sites = _load_sites()
     profile_dirs = [
         Path(tempfile.mkdtemp(prefix=f"pw_profile_{i}_"))

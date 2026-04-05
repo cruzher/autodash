@@ -83,11 +83,12 @@ class SiteConfig:
     # Set to False to disable availability checking entirely for this site.
     availability_check: bool = True
 
-    # If set, a headless Playwright session navigates to the URL and checks
-    # whether this CSS selector exists in the fully-rendered page.  More
-    # reliable than a plain HTTP check because JavaScript is executed,
-    # so dynamic/SPA content is visible.
-    # Leave empty to use a plain HTTP check only (default).
+    # "http"     — HTTP response only (fast, no browser needed)
+    # "selector" — HTTP check followed by a headless Playwright session that
+    #              verifies availability_check_selector exists in the rendered DOM.
+    availability_check_mode: str = "http"
+
+    # CSS selector verified by the headless browser when mode is "selector".
     # Example: availability_check_selector = "#login-form"
     # Example: availability_check_selector = ".dashboard-header"
     availability_check_selector: str = ""

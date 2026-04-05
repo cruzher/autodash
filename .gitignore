@@ -3,6 +3,10 @@
 
 # Site configuration (contains credentials)
 sites.json
+settings.json
+
+# Runtime logs
+logs/
 
 # Python cache
 __pycache__/
