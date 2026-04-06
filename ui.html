@@ -89,6 +89,16 @@
                                              padding: 4px 6px; color: #111827; font-size: 12px; }
   .dynamic-row select { min-width: 90px; }
   .dynamic-row input { flex: 1; min-width: 0; }
+  /* schedule row */
+  .sched-row { display: flex; flex-direction: column; gap: 6px; background: #f9fafb;
+               border: 1px solid #e5e7eb; border-radius: 5px; padding: 8px 10px; }
+  .sched-days { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+  .sched-day  { display: flex; align-items: center; gap: 3px; font-size: 12px; color: #374151; cursor: pointer; }
+  .sched-day input[type=checkbox] { accent-color: #2563eb; width: 13px; height: 13px; cursor: pointer; }
+  .sched-times { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #6b7280; }
+  .sched-times select { background: #fff; border: 1px solid #d1d5db; border-radius: 4px;
+                        padding: 4px 5px; color: #111827; font-size: 12px; }
+  .sched-sep { font-weight: 600; color: #9ca3af; }
   .add-row-btn { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px;
                  padding: 4px 10px; background: none; border: 1px dashed #d1d5db; border-radius: 4px;
                  color: #9ca3af; font-size: 12px; cursor: pointer; }
@@ -316,17 +326,42 @@
               <!-- Schedule -->
               <div class="section-title">Schedule <span style="text-transform:none;font-weight:400;color:#9ca3af;font-size:10px;letter-spacing:0;">— empty = always active</span></div>
               <div class="dynamic-rows">
-                <template x-for="(entry, ei) in site.schedule" :key="ei">
-                  <div class="dynamic-row">
-                    <input x-model="entry[0]" placeholder="Mon-Fri / * / day" style="max-width:110px;">
-                    <input x-model="entry[1]" placeholder="09:00" style="max-width:70px;">
-                    <input x-model="entry[2]" placeholder="17:00" style="max-width:70px;">
-                    <button class="icon-btn danger" @click="site.schedule.splice(ei,1)" title="Remove">&#10005;</button>
+                <template x-for="(sw, ei) in site._schedWindows" :key="ei">
+                  <div class="sched-row">
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+                      <div class="sched-days">
+                        <template x-for="d in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']" :key="d">
+                          <label class="sched-day">
+                            <input type="checkbox" :checked="sw.days[d]"
+                              @change="sw.days[d] = $event.target.checked; syncSchedule(site)">
+                            <span x-text="d"></span>
+                          </label>
+                        </template>
+                      </div>
+                      <button class="icon-btn danger" @click="site._schedWindows.splice(ei,1); syncSchedule(site)" title="Remove">&#10005;</button>
+                    </div>
+                    <div class="sched-times">
+                      <span>From</span>
+                      <select :value="sw.startH" @change="sw.startH = $event.target.value; syncSchedule(site)">
+                        <template x-for="h in hours" :key="h"><option :value="h" x-text="h"></option></template>
+                      </select>
+                      <span class="sched-sep">:</span>
+                      <select :value="sw.startM" @change="sw.startM = $event.target.value; syncSchedule(site)">
+                        <template x-for="m in minutes" :key="m"><option :value="m" x-text="m"></option></template>
+                      </select>
+                      <span>to</span>
+                      <select :value="sw.endH" @change="sw.endH = $event.target.value; syncSchedule(site)">
+                        <template x-for="h in hours" :key="h"><option :value="h" x-text="h"></option></template>
+                      </select>
+                      <span class="sched-sep">:</span>
+                      <select :value="sw.endM" @change="sw.endM = $event.target.value; syncSchedule(site)">
+                        <template x-for="m in minutes" :key="m"><option :value="m" x-text="m"></option></template>
+                      </select>
+                    </div>
                   </div>
                 </template>
               </div>
-              <button class="add-row-btn" @click="site.schedule.push(['Mon-Fri','09:00','17:00'])">+ Add window</button>
-              <p style="font-size:11px;color:#9ca3af;margin-top:6px;">Day specs: Mon-Fri &nbsp;|&nbsp; Sat,Sun &nbsp;|&nbsp; Mon &nbsp;|&nbsp; * &nbsp; — overnight ranges supported</p>
+              <button class="add-row-btn" @click="addSchedWindow(site)">+ Add window</button>
 
             </div>
           </div>
@@ -440,6 +475,53 @@ async function apiFetch(url, opts = {}) {
   return res;
 }
 
+// ---- schedule helpers -------------------------------------------------------
+
+const _DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+function _parseDaySpec(spec) {
+  // Returns {Mon:bool, Tue:bool, ...} from a day spec string like "Mon-Fri", "Sat,Sun", "*"
+  const result = Object.fromEntries(_DAYS.map(d => [d, false]));
+  if (!spec || spec === '*') { _DAYS.forEach(d => result[d] = true); return result; }
+  for (const part of spec.split(',')) {
+    const p = part.trim();
+    if (p.includes('-')) {
+      const [a, b] = p.split('-').map(x => x.trim());
+      const ai = _DAYS.indexOf(a), bi = _DAYS.indexOf(b);
+      if (ai < 0 || bi < 0) continue;
+      if (ai <= bi) for (let i = ai; i <= bi; i++) result[_DAYS[i]] = true;
+      else { for (let i = ai; i < 7; i++) result[_DAYS[i]] = true; for (let i = 0; i <= bi; i++) result[_DAYS[i]] = true; }
+    } else {
+      if (_DAYS.includes(p)) result[p] = true;
+    }
+  }
+  return result;
+}
+
+function _daysToSpec(days) {
+  const active = _DAYS.filter(d => days[d]);
+  if (active.length === 7) return '*';
+  return active.join(',') || 'Mon';
+}
+
+function _pad2(n) { return String(n).padStart(2, '0'); }
+
+function _schedWindowFromEntry(entry) {
+  // entry is [daySpec, "HH:MM", "HH:MM"] or ["HH:MM", "HH:MM"]
+  let daySpec = '*', startStr = '09:00', endStr = '17:00';
+  if (entry.length === 3) { [daySpec, startStr, endStr] = entry; }
+  else if (entry.length === 2) { [startStr, endStr] = entry; }
+  const [sh, sm] = startStr.split(':');
+  const [eh, em] = endStr.split(':');
+  return { days: _parseDaySpec(daySpec), startH: _pad2(+sh||0), startM: _pad2(+sm||0), endH: _pad2(+eh||17), endM: _pad2(+em||0) };
+}
+
+function _schedWindowToEntry(sw) {
+  return [_daysToSpec(sw.days), `${sw.startH}:${sw.startM}`, `${sw.endH}:${sw.endM}`];
+}
+
+// ---- app -------------------------------------------------------------------
+
 function app() {
   return {
     page: "home",
@@ -460,16 +542,21 @@ function app() {
     screenshotError: null,
     screenshotUpdated: "",
     _screenshotTimer: null,
+    hours:   Array.from({length:24}, (_,i) => _pad2(i)),
+    minutes: ['00','05','10','15','20','25','30','35','40','45','50','55'],
 
     async init() {
       try {
         const res = await apiFetch("/sites");
         if (!res) return;
         const data = await res.json();
-        this.sites = data.map(s => ({ _open: false, ...s }));
+        this.sites = data.map(s => ({
+          _open: false,
+          ...s,
+          _schedWindows: (s.schedule || []).map(_schedWindowFromEntry),
+        }));
         if (this.sites.length) this.sites[0]._open = true;
         this.setStatus("Loaded", "ok");
-        // Seed screenshot list from site names
       } catch(e) {
         this.setStatus("Failed to load", "err");
       }
@@ -509,7 +596,18 @@ function app() {
     },
 
     addSite() {
-      this.sites.push(defaultSite());
+      const s = defaultSite();
+      s._schedWindows = [];
+      this.sites.push(s);
+    },
+
+    syncSchedule(site) {
+      site.schedule = site._schedWindows.map(_schedWindowToEntry);
+    },
+
+    addSchedWindow(site) {
+      site._schedWindows.push(_schedWindowFromEntry(['Mon-Fri','09:00','17:00']));
+      this.syncSchedule(site);
     },
 
     removeSite(i) {
@@ -527,7 +625,7 @@ function app() {
     async save() {
       this.saving = true;
       this.setStatus("Saving...", "");
-      const payload = this.sites.map(({ _open, ...s }) => s);
+      const payload = this.sites.map(({ _open, _schedWindows, ...s }) => s);
       try {
         const res = await apiFetch("/sites", {
           method: "PUT",
