@@ -125,6 +125,13 @@
     <p>Dashboard manager</p>
   </div>
   <nav class="sidebar-nav">
+    <button class="nav-btn" :class="page === 'home' && 'active'" @click="page = 'home'; fetchScreenshots()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+      Home
+    </button>
     <button class="nav-btn" :class="page === 'sites' && 'active'" @click="page = 'sites'">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
@@ -164,6 +171,38 @@
 
 <!-- Main -->
 <div class="content">
+
+  <!-- Home page -->
+  <template x-if="page === 'home'">
+    <div style="display:flex;flex-direction:column;flex:1;">
+      <div class="topbar">
+        <h2>Home</h2>
+        <div class="topbar-actions">
+          <span class="status" :class="screenshotUpdated ? 'ok' : ''" x-text="screenshotUpdated"></span>
+          <button class="btn-secondary" @click="fetchScreenshots()">Refresh</button>
+        </div>
+      </div>
+      <div class="page">
+        <div class="site-card" style="max-width:960px;">
+          <div class="card-header" style="cursor:default;">
+            <div class="card-title">Display</div>
+            <span class="status" :class="screenshotError ? 'err' : 'ok'" x-text="screenshotError || 'live'"></span>
+          </div>
+          <div style="background:#111827;border-radius:0 0 8px 8px;overflow:hidden;line-height:0;">
+            <template x-if="screenshotSrc">
+              <img :src="screenshotSrc" style="width:100%;display:block;" alt="Display screenshot">
+            </template>
+            <template x-if="!screenshotSrc && screenshotError">
+              <div style="padding:40px;text-align:center;color:#6b7280;font-size:13px;" x-text="screenshotError"></div>
+            </template>
+            <template x-if="!screenshotSrc && !screenshotError">
+              <div style="padding:40px;text-align:center;color:#6b7280;font-size:13px;">Loading...</div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
 
   <!-- Sites page -->
   <template x-if="page === 'sites'">
@@ -403,7 +442,7 @@ async function apiFetch(url, opts = {}) {
 
 function app() {
   return {
-    page: "sites",
+    page: "home",
     sites: [],
     saving: false,
     statusMsg: "",
@@ -417,6 +456,10 @@ function app() {
     logAutoScroll: true,
     logAutoRefresh: false,
     _logTimer: null,
+    screenshotSrc: null,
+    screenshotError: null,
+    screenshotUpdated: "",
+    _screenshotTimer: null,
 
     async init() {
       try {
@@ -426,6 +469,7 @@ function app() {
         this.sites = data.map(s => ({ _open: false, ...s }));
         if (this.sites.length) this.sites[0]._open = true;
         this.setStatus("Loaded", "ok");
+        // Seed screenshot list from site names
       } catch(e) {
         this.setStatus("Failed to load", "err");
       }
@@ -433,6 +477,30 @@ function app() {
         const res = await apiFetch("/settings");
         if (res) this.settings = await res.json();
       } catch(e) { /* use defaults */ }
+      // Start auto-refresh for home page
+      this._screenshotTimer = setInterval(() => {
+        if (this.page === 'home') this.fetchScreenshots();
+      }, 10000);
+      if (this.page === 'home') this.fetchScreenshots();
+    },
+
+    async fetchScreenshots() {
+      try {
+        const res = await apiFetch("/screenshot");
+        if (!res) return;
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          this.screenshotError = body.detail || "Failed to capture display";
+          return;
+        }
+        const blob = await res.blob();
+        if (this.screenshotSrc) URL.revokeObjectURL(this.screenshotSrc);
+        this.screenshotSrc = URL.createObjectURL(blob);
+        this.screenshotError = null;
+        this.screenshotUpdated = "Updated " + new Date().toLocaleTimeString();
+      } catch(e) {
+        this.screenshotError = e.message;
+      }
     },
 
     async signOut() {

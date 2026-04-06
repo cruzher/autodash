@@ -25,7 +25,7 @@ from playwright.async_api import (
 )
 
 from fastapi import Depends, FastAPI, Form, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 import uvicorn
 
 from auth import (
@@ -74,6 +74,10 @@ _LOG_DIR.mkdir(exist_ok=True)
 _LOG_PATH = _LOG_DIR / "autodash.log"
 
 WEB_PORT = int(os.environ.get("WEB_PORT", 8080))
+
+# Populated by main() — holds the live SiteMonitor instances so the web API
+# can access their Playwright pages (e.g. for screenshots).
+_monitors: list = []
 
 
 def _load_sites() -> list:
@@ -210,6 +214,26 @@ async def api_auth_logout(request: Request):
     response = RedirectResponse("/login", status_code=303)
     response.delete_cookie("session")
     return response
+
+
+@api.get("/screenshot")
+async def api_screenshot(_: None = Depends(require_auth)):
+    """Return a PNG screenshot of the primary physical display."""
+    import mss
+    import mss.tools
+
+    def _grab():
+        with mss.mss() as sct:
+            monitor = sct.monitors[1]  # monitors[0] is the all-screens aggregate
+            frame = sct.grab(monitor)
+            return mss.tools.to_png(frame.rgb, frame.size)
+
+    try:
+        loop = asyncio.get_running_loop()
+        png = await loop.run_in_executor(None, _grab)
+        return Response(content=png, media_type="image/png")
+    except Exception as exc:
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 
 async def check_site_available(url: str) -> bool:
@@ -1308,6 +1332,8 @@ async def main():
             SiteMonitor(cfg, pw, profile_dirs[i])
             for i, cfg in enumerate(initial_sites)
         ]
+        global _monitors
+        _monitors = monitors  # same list object — coordinator mutations are reflected here
         coordinator = asyncio.create_task(
             schedule_coordinator(monitors, pw), name="coordinator"
         )
