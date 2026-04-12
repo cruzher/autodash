@@ -67,160 +67,34 @@ On Linux, re-running `start.sh` is safe — dependency installation is skipped a
 
 ## Configuration
 
-### 1. Start the monitor and open the UI
+Open the web UI in a browser:
 
 ```
 http://<machine-ip>:8080/ui
 ```
 
-Add one entry per dashboard. Each entry opens one browser window. Changes are saved to `sites.json` and picked up automatically within 60 seconds — no restart needed.
+On the first visit you will be prompted to create a username and password. Subsequent visits require those credentials to log in (sessions expire after 8 hours).
+
+Add one entry per dashboard. Each entry opens one Chromium window. Changes are picked up automatically within 60 seconds — no restart needed.
 
 > The port defaults to `8080`. Override with the `WEB_PORT` environment variable:
 > ```
 > WEB_PORT=9090 python monitor.py
 > ```
 
-### 2. Field reference
-
-| Field | Default | Description |
-|---|---|---|
-| `name` | *(required)* | Label used in logs |
-| `url` | *(required)* | URL to open (login page) |
-| `username` | *(required)* | Login username / email |
-| `password` | *(required)* | Login password |
-| `fullscreen` | `False` | Fill entire screen (kiosk mode) |
-| `zoom` | `1.0` | Browser zoom level (`1.0` = 100 %, `1.5` = 150 %, `0.8` = 80 %, etc.) |
-| `window_x` | `0` | Window left position in pixels |
-| `window_y` | `0` | Window top position in pixels |
-| `window_width` | `1280` | Window width in pixels |
-| `window_height` | `900` | Window height in pixels |
-| `post_login_url` | `""` | Navigate here after login; leave empty to stay on the landing page |
-| `schedule` | `[]` | List of active time windows (see [Scheduling](#scheduling)). Empty = always active |
-| `username_selector` | *(auto)* | CSS selector for the username field |
-| `password_selector` | *(auto)* | CSS selector for the password field |
-| `submit_selector` | *(auto)* | CSS selector for the submit button |
-| `logged_in_selector` | `""` | CSS selector that only exists when logged in |
-| `logged_in_url_fragment` | `""` | URL path/fragment that indicates an authenticated page |
-| `extra_username_selectors` | `[]` | Additional fallback CSS selectors for the username field |
-| `extra_password_selectors` | `[]` | Additional fallback CSS selectors for the password field |
-| `auto_login` | `True` | Set to `False` for public pages that need no login |
-| `availability_check` | `True` | Set to `False` to skip availability checking for this site |
-| `availability_check_selector` | `""` | CSS selector verified via headless browser before opening (more reliable than HTTP for JS-heavy sites); leave empty to use HTTP check only |
-
-### 3. Multi-step and multi-field login (`login_steps`)
-
-Some sites show the username and password on separate pages (e.g. Microsoft, Google, many SSO portals), or include extra fields such as a domain or PIN. Use `login_steps` for these cases. When set it replaces the simple `username_selector` / `password_selector` / `submit_selector` flow entirely.
-
-Each step has an **action**, a **CSS selector**, and an optional **value**:
-
-| Action | Behaviour |
-|---|---|
-| `"fill"` | Finds the field, clears it, and types the value. Use `{username}` or `{password}` as placeholders. |
-| `"click"` | Clicks the element and waits 1 second for the page to react. |
-| `"press"` | Presses a key. `value` is the key name (e.g. `"Enter"`, `"Tab"`); defaults to `Enter`. When `selector` is omitted the key is sent to whatever element is currently focused. |
-| `"wait_for"` | Waits up to 15 seconds for the selector to appear before continuing. |
-
-**Multi-step example** (username page → Next → password page → Sign in):
-
-| Action | Selector | Value |
-|---|---|---|
-| `fill` | `input[name='loginfmt']` | `{username}` |
-| `press` | *(empty)* | `Enter` |
-| `wait_for` | `input[type='password']` | |
-| `fill` | `input[type='password']` | `{password}` |
-| `press` | *(empty)* | `Enter` |
-
-Use `"click"` instead of `"press"` if the page has a visible submit button you want to click directly.
-
-**Extra field example** (domain on the same page):
-
-| Action | Selector | Value |
-|---|---|---|
-| `fill` | `input[name='username']` | `{username}` |
-| `fill` | `input[type='password']` | `{password}` |
-| `fill` | `input[name='domain']` | `CORP` |
-| `click` | `button[type='submit']` | |
-
-#### Finding the right selector
-
-Right-click the field in the browser → **Inspect** and look at the `<input>` element's attributes. Common patterns:
-
-| Attribute | Selector example |
-|---|---|
-| `name` attribute | `input[name='Username']` |
-| `id` attribute | `#username` |
-| `placeholder` text | `input[placeholder='Username']` |
-| `aria-label` | `input[aria-label='Username']` |
-| ARIA role + name | `role=textbox[name='Username']` |
-
-> **Note:** `textbox` is an ARIA role, not an HTML element. Use `input[...]` for standard HTML fields. The ARIA `role=` syntax is only needed when the element has an explicit `role="textbox"` attribute.
-
----
-
-### 3. Public pages (no login)
-
-Set `auto_login` to `false` for sites that do not have a login form. The monitor will still open the page, keep the window alive, and refresh it — it simply skips all login logic.
-
 ---
 
 ## Scheduling
 
-Each site can optionally define a list of active time windows via the `schedule` field. When a site is outside its schedule its window is closed automatically. When no site is scheduled, a fullscreen **"No Dashboard Scheduled"** notice is shown and the display is allowed to sleep. The windows reopen automatically when a schedule window starts.
+Each site can optionally be given one or more active time windows. When a site is outside its schedule its window is closed automatically. When no site is scheduled, a fullscreen **"No Dashboard Scheduled"** notice is shown. The windows reopen automatically when a schedule window starts.
 
-An empty `schedule` (the default) means the site is **always active** — identical to the pre-scheduling behaviour.
-
-### Entry formats
-
-| Format | Example | Meaning |
-|---|---|---|
-| `("HH:MM", "HH:MM")` | `("09:00", "17:00")` | Every day, 09:00–17:00 |
-| `("day-spec", "HH:MM", "HH:MM")` | `("Mon-Fri", "09:00", "17:00")` | Weekdays only |
-
-**Day specs:**
-
-| Spec | Meaning |
-|---|---|
-| `"Mon-Fri"` | Monday through Friday |
-| `"Sat,Sun"` | Saturday and Sunday |
-| `"Mon"` | Monday only |
-| `"*"` | Every day |
-
-Multiple windows can be listed in a single schedule:
-
-```python
-schedule = [
-    ("Mon-Fri", "08:00", "18:00"),
-    ("Sat",     "09:00", "13:00"),
-]
-```
-
-Overnight windows (e.g. `"22:00"` to `"06:00"`) are supported.
-
-### Schedule check interval
-
-The schedule is checked every `SCHEDULE_CHECK_SECONDS` (default `60`) seconds. Windows open/close within one check interval of the boundary time.
-
----
-
-## Timing
-
-Timing constants are at the top of `monitor.py`:
-
-| Constant | Default | Description |
-|---|---|---|
-| `REFRESH_INTERVAL_SECONDS` | `600` | Full page reload interval |
-| `CHECK_INTERVAL_SECONDS` | `30` | How often to check session / connectivity |
-| `RECONNECT_DELAY_SECONDS` | `5` | Wait before reopening a closed window |
-| `POSITION_CHECK_SECONDS` | `10` | How often to check window position (Linux) |
-| `POSITION_TOLERANCE_PX` | `5` | Pixel drift allowed before correcting the window |
+Schedules are configured in the web UI. Overnight windows (e.g. 22:00–06:00) are supported.
 
 ---
 
 ## Offline behaviour
 
-When internet connectivity is lost all browser windows navigate to a local `offline.html` page that displays a "No Internet Connection" notice. The monitor polls for connectivity every `CHECK_INTERVAL_SECONDS` seconds and automatically resumes normal operation once the connection is restored.
-
-Connectivity is checked by attempting a TCP connection to `8.8.8.8:53` (Google DNS). This can be changed via `INTERNET_CHECK_HOST` / `INTERNET_CHECK_PORT` in `monitor.py`.
+When internet connectivity is lost all browser windows navigate to a local offline page. The monitor polls for connectivity every 30 seconds and automatically resumes normal operation once the connection is restored.
 
 ---
 
@@ -231,8 +105,6 @@ On Linux the monitor uses `xdotool` and `wmctrl` to position and track windows. 
 ```bash
 sudo apt install xdotool wmctrl
 ```
-
-For fullscreen / kiosk mode set `fullscreen=True` in the site config; window position and size fields are ignored in that case.
 
 > **Note:** Run the monitor as a non-root user where possible. Running as root causes Chromium to display a `--no-sandbox` security warning.
 
@@ -260,12 +132,17 @@ Replace the path with the actual location of `start.sh` on your system.
 
 | File | Purpose |
 |---|---|
-| `monitor.py` | Main monitor — browser management, login, session keeping |
-| `config.py` | `SiteConfig` dataclass definition and JSON helpers |
-| `sites.json` | Your site list — managed via the web UI (auto-created on first save) |
+| `monitor.py` | Main monitor — browser management, login, session keeping, web API |
+| `config.py` | `SiteConfig` dataclass and JSON helpers |
+| `auth.py` | Web UI authentication — password hashing and session management |
+| `auth.json` | Hashed web UI credentials (created on first login setup) |
+| `sites.json` | Site list — managed via the web UI |
+| `settings.json` | Global settings — managed via the web UI |
 | `ui.html` | Web-based configuration editor (served at `/ui`) |
+| `login.html` | Web UI login page |
 | `offline.html` | Fullscreen page shown when internet is unavailable |
 | `no_schedule.html` | Fullscreen page shown when no site is currently scheduled |
+| `site_unavailable.html` | Fullscreen page shown when a site cannot be reached |
 | `start.sh` | Bootstrap and launch script (Linux) |
 | `install.ps1` | Dependency install script (Windows) |
 | `uninstall.ps1` | Remove startup entry and virtual environment (Windows) |
