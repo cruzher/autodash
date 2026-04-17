@@ -100,6 +100,15 @@ Open the web UI, expand a site, and scroll to the **Multi-step login** section (
 
 Use `{username}` and `{password}` as placeholders in the **Value** field — they are substituted with the credentials stored for that site.
 
+Two selector formats are supported in the **CSS selector** field:
+
+| Format | Example | Equivalent Playwright call |
+|---|---|---|
+| `role=<role>[name="<text>"]` | `role=textbox[name="Username"]` | `get_by_role("textbox", name="Username")` |
+| CSS selector | `input[type='password']` | `locator("input[type='password']")` |
+
+The `role=` format maps directly to what Playwright's codegen produces — copy the role and name from a `get_by_role(...)` call and write it as `role=<role>[name="<text>"]`.
+
 ### Actions
 
 | Action | What it does |
@@ -111,20 +120,27 @@ Use `{username}` and `{password}` as placeholders in the **Value** field — the
 
 ### Examples
 
-**Standard two-field form (equivalent to the built-in flow)**
+**Standard two-field form using Playwright codegen role selectors**
+```
+fill    role=textbox[name="Username"]    {username}
+fill    role=textbox[name="Password"]    {password}
+click   role=button[name="Sign In"]
+```
+
+**Username on page 1, password on page 2 (role selectors)**
+```
+fill      role=textbox[name="Username"]    {username}
+click     role=button[name="Sign In"]
+wait_for  role=textbox[name="Password"]
+fill      role=textbox[name="Password"]    {password}
+click     role=button[name="Sign In"]
+```
+
+**Standard two-field form using CSS selectors**
 ```
 fill    input[name='username']      {username}
 fill    input[type='password']      {password}
 click   button[type='submit']
-```
-
-**Username on page 1, password on page 2**
-```
-fill    input[name='email']         {username}
-click   button[type='submit']
-wait_for  input[type='password']
-fill    input[type='password']      {password}
-press   input[type='password']      Enter
 ```
 
 **Login behind a button that opens a modal**

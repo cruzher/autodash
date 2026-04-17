@@ -910,6 +910,24 @@ class SiteMonitor:
                 self.log.info("Already logged in.")
                 await self._maybe_goto_post_login()
 
+    def _resolve_locator(self, selector: str):
+        """Return a Playwright Locator for a selector string.
+
+        Supports:
+          role=button[name="Sign In"]   → page.get_by_role("button", name="Sign In")
+          role=textbox[name="Username"] → page.get_by_role("textbox", name="Username")
+          anything else                 → page.locator(selector)  (CSS / XPath)
+        """
+        import re
+        m = re.fullmatch(
+            r'role=([a-zA-Z]+)(?:\[name=["\']?(.*?)["\']?\])?',
+            selector.strip(),
+        )
+        if m:
+            role, name = m.group(1), m.group(2)
+            return self.page.get_by_role(role, name=name) if name else self.page.get_by_role(role)
+        return self.page.locator(selector)
+
     async def _login_with_steps(self):
         subs = {"{username}": self.cfg.username, "{password}": self.cfg.password}
         for step in self.cfg.login_steps:
@@ -918,35 +936,42 @@ class SiteMonitor:
                 value = value.replace(k, v)
 
             if step.action == "fill":
-                el = await self._find_element([step.selector])
-                if el is None:
+                loc = self._resolve_locator(step.selector).first
+                try:
+                    await loc.wait_for(state="visible", timeout=10_000)
+                    await loc.click()
+                    await loc.fill(value)
+                except PlaywrightTimeoutError:
                     self.log.error("Login step: element not found: %s", step.selector)
                     return
-                await el.click()
-                await el.fill(value)
 
             elif step.action == "click":
-                el = await self._find_element([step.selector])
-                if el is None:
+                loc = self._resolve_locator(step.selector).first
+                try:
+                    await loc.wait_for(state="visible", timeout=10_000)
+                    await loc.click()
+                    await asyncio.sleep(1)
+                except PlaywrightTimeoutError:
                     self.log.error("Login step: element not found: %s", step.selector)
                     return
-                await el.click()
-                await asyncio.sleep(1)
 
             elif step.action == "press":
                 if step.selector:
-                    el = await self._find_element([step.selector])
-                    if el is None:
+                    loc = self._resolve_locator(step.selector).first
+                    try:
+                        await loc.wait_for(state="visible", timeout=10_000)
+                        await loc.press(value or "Enter")
+                    except PlaywrightTimeoutError:
                         self.log.error("Login step: element not found: %s", step.selector)
                         return
-                    await el.press(value or "Enter")
                 else:
                     await self.page.keyboard.press(value or "Enter")
                 await asyncio.sleep(1)
 
             elif step.action == "wait_for":
+                loc = self._resolve_locator(step.selector)
                 try:
-                    await self.page.wait_for_selector(step.selector, timeout=15_000)
+                    await loc.first.wait_for(state="visible", timeout=15_000)
                 except PlaywrightTimeoutError:
                     self.log.error("Login step: timed out waiting for: %s", step.selector)
                     return
