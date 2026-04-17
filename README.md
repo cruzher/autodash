@@ -84,6 +84,62 @@ Add one entry per dashboard. Each entry opens one Chromium window. Changes are p
 
 ---
 
+## Multi-step login
+
+Some sites split the login process across multiple pages or use non-standard form layouts (e.g. username on one page, password on the next, or a modal that appears after clicking a button). The multi-step login feature lets you define a custom sequence of actions that replaces the standard username/password/submit flow entirely.
+
+### How to configure
+
+Open the web UI, expand a site, and scroll to the **Multi-step login** section (visible when **Auto login** is enabled). Click **+ Add step** to add actions one at a time. Each step has three fields:
+
+| Field | Description |
+|---|---|
+| Action | What to do: `fill`, `click`, `wait_for`, or `press` |
+| CSS selector | The element to target (optional for `press`) |
+| Value | Text to type (`fill`), key name (`press`), or empty (`click` / `wait_for`) |
+
+Use `{username}` and `{password}` as placeholders in the **Value** field — they are substituted with the credentials stored for that site.
+
+### Actions
+
+| Action | What it does |
+|---|---|
+| `fill` | Clicks the element then types the given value into it |
+| `click` | Clicks the element and waits 1 second |
+| `wait_for` | Pauses until the element appears in the DOM (timeout: 15 s) |
+| `press` | Presses a keyboard key on the element (or the whole page if no selector) |
+
+### Examples
+
+**Standard two-field form (equivalent to the built-in flow)**
+```
+fill    input[name='username']      {username}
+fill    input[type='password']      {password}
+click   button[type='submit']
+```
+
+**Username on page 1, password on page 2**
+```
+fill    input[name='email']         {username}
+click   button[type='submit']
+wait_for  input[type='password']
+fill    input[type='password']      {password}
+press   input[type='password']      Enter
+```
+
+**Login behind a button that opens a modal**
+```
+click   #open-login-modal
+wait_for  #login-modal input[name='user']
+fill    #login-modal input[name='user']      {username}
+fill    #login-modal input[name='pass']      {password}
+click   #login-modal button.submit
+```
+
+> When `login_steps` is non-empty it replaces the standard selector-based flow completely. The **Username selector**, **Password selector**, and **Submit selector** fields are ignored.
+
+---
+
 ## Scheduling
 
 Each site can optionally be given one or more active time windows. When a site is outside its schedule its window is closed automatically. When no site is scheduled, a fullscreen **"No Dashboard Scheduled"** notice is shown. The windows reopen automatically when a schedule window starts.
