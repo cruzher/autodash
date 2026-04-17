@@ -41,10 +41,12 @@ fi
 echo "[OK] Python $(python3 --version 2>&1 | cut -d' ' -f2)"
 
 # -- Virtual environment ---------------------------------------------------
+VENV_CREATED=false
 if [ ! -f "$VENV_DIR/bin/activate" ]; then
     echo "[..] Creating virtual environment ..."
     python3 -m venv "$VENV_DIR"
     echo "[OK] Virtual environment created."
+    VENV_CREATED=true
 fi
 . "$VENV_DIR/bin/activate"
 
@@ -53,7 +55,7 @@ CURRENT_HASH=$(sha256sum "$REQUIREMENTS" 2>/dev/null | cut -d' ' -f1 || true)
 STORED_HASH=$(cat "$HASH_FILE" 2>/dev/null || true)
 DEPS_UPDATED=false
 
-if [ "$CURRENT_HASH" != "$STORED_HASH" ]; then
+if [ "$VENV_CREATED" = "true" ] || [ "$CURRENT_HASH" != "$STORED_HASH" ]; then
     echo "[..] Installing Python dependencies ..."
     pip install --upgrade pip --quiet
     if [ -f "$REQUIREMENTS" ]; then
