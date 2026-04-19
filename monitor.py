@@ -3,6 +3,7 @@ monitor.py - Multi-Site Auto-Login Monitor using Playwright (Chromium)
 """
 
 import asyncio
+import pyotp
 import datetime
 import json
 import logging
@@ -929,7 +930,8 @@ class SiteMonitor:
         return self.page.locator(selector)
 
     async def _login_with_steps(self):
-        subs = {"{username}": self.cfg.username, "{password}": self.cfg.password}
+        totp_token = pyotp.TOTP(self.cfg.totp_secret).now() if self.cfg.totp_secret else ""
+        subs = {"{username}": self.cfg.username, "{password}": self.cfg.password, "{totp}": totp_token}
         for step in self.cfg.login_steps:
             value = step.value
             for k, v in subs.items():

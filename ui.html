@@ -212,6 +212,9 @@
         <h2>Sites</h2>
         <div class="topbar-actions">
           <span class="status" :class="statusClass" x-text="statusMsg"></span>
+          <button class="btn-secondary" @click="exportSites()">Export</button>
+          <button class="btn-secondary" @click="$refs.importFile.click()">Import</button>
+          <input type="file" accept=".json" x-ref="importFile" class="hidden" @change="importSites($event)">
           <button class="btn-secondary" @click="addSite()">+ Add site</button>
           <button class="btn-primary" @click="save()" :disabled="saving">Save</button>
         </div>
@@ -249,6 +252,7 @@
                 <div class="field"><label>URL</label><input x-model="site.url" placeholder="https://"></div>
                 <div class="field"><label>Username</label><input x-model="site.username"></div>
                 <div class="field"><label>Password</label><input type="password" x-model="site.password"></div>
+                <div class="field"><label>TOTP secret</label><input type="password" x-model="site.totp_secret" placeholder="Base32 secret (optional)"></div>
               </div>
 
               <!-- Window -->
@@ -289,7 +293,18 @@
                         <option value="press">press</option>
                       </select>
                       <input x-model="step.selector" placeholder="CSS selector (optional for press)">
-                      <input x-model="step.value" placeholder="value / key (e.g. Enter)">
+                      <template x-if="step.action === 'fill'">
+                        <div style="display:contents">
+                          <select :value="['{username}','{password}','{totp}'].includes(step.value) ? step.value : 'custom'" @change="step.value = $event.target.value === 'custom' ? '' : $event.target.value">
+                            <option value="{username}">username</option>
+                            <option value="{password}">password</option>
+                            <option value="{totp}">totp</option>
+                            <option value="custom">custom</option>
+                          </select>
+                          <input x-show="!['{username}','{password}','{totp}'].includes(step.value)" x-model="step.value" placeholder="custom value">
+                        </div>
+                      </template>
+                      <input x-show="step.action === 'press'" x-model="step.value" placeholder="key (e.g. Enter)">
                       <button class="icon-btn danger" @click="site.login_steps.splice(li,1)" title="Remove">&#10005;</button>
                     </div>
                   </template>
@@ -412,6 +427,7 @@ function defaultSite() {
     url: "",
     username: "",
     password: "",
+    totp_secret: "",
     fullscreen: false,
     zoom: 1.0,
     window_x: 0,
@@ -526,6 +542,32 @@ function app() {
       const j = i + dir;
       if (j < 0 || j >= this.sites.length) return;
       [this.sites[i], this.sites[j]] = [this.sites[j], this.sites[i]];
+    },
+
+    exportSites() {
+      const data = this.sites.map(({ _open, ...s }) => s);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "sites_export.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+
+    async importSites(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        if (!Array.isArray(data)) throw new Error("Expected a JSON array");
+        this.sites = data.map(s => ({ _open: false, ...s }));
+        this.setStatus(`Imported ${data.length} site(s). Click Save to apply.`, "ok");
+      } catch (e) {
+        this.setStatus("Import failed: " + e.message, "err");
+      }
+      event.target.value = "";
     },
 
     async save() {

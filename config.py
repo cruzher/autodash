@@ -24,10 +24,11 @@ class LoginStep:
 
 @dataclass
 class SiteConfig:
-    name:     str
-    url:      str
-    username: str
-    password: str
+    name:        str
+    url:         str
+    username:    str
+    password:    str
+    totp_secret: str = ""
 
     # Window geometry (x, y, width, height) — ignored when fullscreen=True
     window_x:      int = 0
