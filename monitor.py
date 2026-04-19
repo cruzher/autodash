@@ -881,15 +881,6 @@ class SiteMonitor:
         else:
             await self.navigate_and_login()
 
-    async def _apply_zoom(self):
-        if self.cfg.zoom != 1.0:
-            try:
-                await self.page.evaluate(
-                    f"document.documentElement.style.zoom = '{self.cfg.zoom}'"
-                )
-            except Exception as exc:
-                self.log.debug("zoom apply (non-fatal): %s", exc)
-
     async def navigate_and_login(self):
         self.log.info("Navigating to %s", self.cfg.url)
         try:
@@ -903,7 +894,6 @@ class SiteMonitor:
         await asyncio.sleep(2)
         if not self.cfg.fullscreen:
             await fit_viewport_to_window(self.page)
-        await self._apply_zoom()
         if self.cfg.auto_login:
             if not await self.is_logged_in():
                 await self.login()
@@ -1031,7 +1021,6 @@ class SiteMonitor:
             )
             if not self.cfg.fullscreen:
                 await fit_viewport_to_window(self.page)
-            await self._apply_zoom()
         except PlaywrightTimeoutError:
             self.log.warning("Post-login navigation timed out - continuing anyway.")
         except Exception as exc:
@@ -1065,7 +1054,6 @@ class SiteMonitor:
         except PlaywrightTimeoutError:
             self.log.warning("Reload timed out - continuing.")
         await asyncio.sleep(2)
-        await self._apply_zoom()
         if self.cfg.auto_login and not await self.is_logged_in():
             self.log.warning("Session expired after refresh - re-logging in.")
             await self.login()

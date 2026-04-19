@@ -6,7 +6,7 @@ Imported by both sites.py (for configuration) and monitor.py (for type hints).
 
 import json
 import pathlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 
 
 @dataclass
@@ -39,8 +39,6 @@ class SiteConfig:
     # Set to True to launch this window in fullscreen (kiosk-style)
     fullscreen: bool = False
 
-    # Browser zoom level (1.0 = 100 %, 1.5 = 150 %, 0.8 = 80 %, etc.)
-    zoom: float = 1.0
 
     # Optional: navigate to this URL after a successful login.
     # Leave empty to stay on whatever page the site lands on after login.
@@ -120,6 +118,8 @@ def load_sites_json(path) -> list:
         steps = [LoginStep(**step) for step in s.pop("login_steps", [])]
         # schedule entries are stored as lists in JSON; convert back to tuples
         schedule = [tuple(entry) for entry in s.pop("schedule", [])]
+        known = {f.name for f in fields(SiteConfig)}
+        s = {k: v for k, v in s.items() if k in known}
         sites.append(SiteConfig(**s, login_steps=steps, schedule=schedule))
     return sites
 

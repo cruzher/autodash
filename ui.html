@@ -259,7 +259,6 @@
               <div class="section-title">Window</div>
               <div class="field-grid">
                 <div class="field checkbox-row"><input type="checkbox" x-model="site.fullscreen" :id="'fs-'+si"><label :for="'fs-'+si">Fullscreen (kiosk)</label></div>
-                <div class="field"><label>Zoom (1.0 = 100%)</label><input type="number" step="0.1" min="0.1" max="5" x-model.number="site.zoom"></div>
                 <div class="field"><label>Window X</label><input type="number" x-model.number="site.window_x"></div>
                 <div class="field"><label>Window Y</label><input type="number" x-model.number="site.window_y"></div>
                 <div class="field"><label>Width</label><input type="number" x-model.number="site.window_width"></div>
@@ -429,7 +428,6 @@ function defaultSite() {
     password: "",
     totp_secret: "",
     fullscreen: false,
-    zoom: 1.0,
     window_x: 0,
     window_y: 0,
     window_width: 1280,
