@@ -400,6 +400,18 @@
               <label for="sleep-when-idle">Allow display sleep when nothing is scheduled</label>
             </div>
             <p class="hint" style="margin-top:6px;">When enabled, the display is allowed to sleep normally during periods with no active dashboard. When disabled, the display stays awake at all times.</p>
+            <div class="section-title">Monitoring heartbeat</div>
+            <div class="field-grid" style="grid-template-columns:1fr 1fr;">
+              <div class="field">
+                <label>Webhook URL</label>
+                <input type="url" x-model="settings.heartbeat_url" placeholder="https://uptime.example.com/ping/...">
+              </div>
+              <div class="field">
+                <label>Interval (seconds)</label>
+                <input type="number" min="10" step="10" x-model.number="settings.heartbeat_interval">
+              </div>
+            </div>
+            <p class="hint" style="margin-top:6px;">When set, autodash will GET the webhook URL at the configured interval so external monitoring services know the system is alive.</p>
           </div>
         </div>
       </div>
@@ -483,7 +495,7 @@ function app() {
     saving: false,
     statusMsg: "",
     statusClass: "",
-    settings: { refresh_interval: 600, sleep_when_idle: true },
+    settings: { refresh_interval: 600, sleep_when_idle: true, heartbeat_url: "", heartbeat_interval: 60 },
     sysinfo: null,
     settingsSaving: false,
     settingsStatusMsg: "",

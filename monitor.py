@@ -111,7 +111,7 @@ async def api_put_sites(request: Request, _: None = Depends(require_auth)):
     return {"ok": True}
 
 
-_DEFAULT_SETTINGS = {"refresh_interval": 600, "sleep_when_idle": True}
+_DEFAULT_SETTINGS = {"refresh_interval": 600, "sleep_when_idle": True, "heartbeat_url": "", "heartbeat_interval": 60}
 
 
 def _load_settings() -> dict:
@@ -123,13 +123,31 @@ def _load_settings() -> dict:
         return dict(_DEFAULT_SETTINGS)
 
 
-_sleep_when_idle = True
+_sleep_when_idle    = True
+_heartbeat_url      = ""
+_heartbeat_interval = 60
 
 
 def _apply_settings(s: dict) -> None:
-    global REFRESH_INTERVAL_SECONDS, _sleep_when_idle
+    global REFRESH_INTERVAL_SECONDS, _sleep_when_idle, _heartbeat_url, _heartbeat_interval
     REFRESH_INTERVAL_SECONDS = max(60, int(s.get("refresh_interval", 600)))
-    _sleep_when_idle = bool(s.get("sleep_when_idle", True))
+    _sleep_when_idle    = bool(s.get("sleep_when_idle", True))
+    _heartbeat_url      = str(s.get("heartbeat_url", "") or "")
+    _heartbeat_interval = max(10, int(s.get("heartbeat_interval", 60)))
+
+
+async def _heartbeat_loop():
+    log = logging.getLogger("heartbeat")
+    while True:
+        await asyncio.sleep(_heartbeat_interval)
+        url = _heartbeat_url
+        if url:
+            try:
+                import urllib.request
+                urllib.request.urlopen(url, timeout=10)
+                log.debug("Heartbeat OK: %s", url)
+            except Exception as exc:
+                log.warning("Heartbeat failed (%s): %s", url, exc)
 
 
 @api.get("/sysinfo")
@@ -1374,7 +1392,8 @@ async def main():
         coordinator = asyncio.create_task(
             schedule_coordinator(monitors, pw), name="coordinator"
         )
-        keepalive = asyncio.create_task(display_keepalive(), name="keepalive")
+        keepalive  = asyncio.create_task(display_keepalive(), name="keepalive")
+        heartbeat  = asyncio.create_task(_heartbeat_loop(), name="heartbeat")
         web_config = uvicorn.Config(
             api, host="0.0.0.0", port=WEB_PORT, log_level="warning"
         )
@@ -1389,6 +1408,7 @@ async def main():
             logging.info("Shutting down ...")
             coordinator.cancel()
             keepalive.cancel()
+            heartbeat.cancel()
             web_server.should_exit = True
             web_task.cancel()
             for m in monitors:
