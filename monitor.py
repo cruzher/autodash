@@ -132,6 +132,28 @@ def _apply_settings(s: dict) -> None:
     _sleep_when_idle = bool(s.get("sleep_when_idle", True))
 
 
+@api.get("/sysinfo")
+def api_get_sysinfo(_: None = Depends(require_auth)):
+    import sys
+    return JSONResponse(content={
+        "os":         platform.system(),
+        "os_version": platform.version(),
+        "os_release": platform.release(),
+        "machine":    platform.machine(),
+        "hostname":   platform.node(),
+        "python":     sys.version.split()[0],
+    })
+
+
+@api.post("/reboot")
+def api_reboot(_: None = Depends(require_auth)):
+    if platform.system() == "Windows":
+        subprocess.Popen(["shutdown", "/r", "/t", "0"])
+    else:
+        subprocess.Popen(["reboot"])
+    return JSONResponse(content={"ok": True})
+
+
 @api.get("/settings")
 def api_get_settings(_: None = Depends(require_auth)):
     return JSONResponse(content=_load_settings())

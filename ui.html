@@ -364,7 +364,26 @@
       <div class="page">
         <div class="site-card" style="max-width:480px;">
           <div class="card-body" style="display:block;">
-            <div class="section-title" style="margin-top:0;">Page refresh</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <div class="section-title" style="margin-top:0;margin-bottom:0;">System information</div>
+              <button class="btn-secondary" style="color:#ef4444;" @click="reboot()">Reboot</button>
+            </div>
+            <div class="field-grid" style="grid-template-columns:auto 1fr;gap:4px 16px;">
+              <template x-if="sysinfo">
+                <template x-for="[k,v] in Object.entries(sysinfo)" :key="k">
+                  <template x-if="true">
+                    <div style="display:contents">
+                      <span style="color:#9ca3af;font-size:12px;text-transform:capitalize;" x-text="k.replace('_',' ')"></span>
+                      <span style="font-size:12px;font-family:monospace;" x-text="v"></span>
+                    </div>
+                  </template>
+                </template>
+              </template>
+              <template x-if="!sysinfo">
+                <span style="color:#9ca3af;font-size:12px;">Loading…</span>
+              </template>
+            </div>
+            <div class="section-title">Page refresh</div>
             <div class="field-grid" style="grid-template-columns:1fr 1fr;">
               <div class="field">
                 <label>Refresh interval (seconds)</label>
@@ -465,6 +484,7 @@ function app() {
     statusMsg: "",
     statusClass: "",
     settings: { refresh_interval: 600, sleep_when_idle: true },
+    sysinfo: null,
     settingsSaving: false,
     settingsStatusMsg: "",
     settingsStatusClass: "",
@@ -495,6 +515,10 @@ function app() {
         const res = await apiFetch("/settings");
         if (res) this.settings = await res.json();
       } catch(e) { /* use defaults */ }
+      try {
+        const res = await apiFetch("/sysinfo");
+        if (res) this.sysinfo = await res.json();
+      } catch(e) { /* non-critical */ }
       // Start auto-refresh for home page
       this._screenshotTimer = setInterval(() => {
         if (this.page === 'home') this.fetchScreenshots();
@@ -649,6 +673,11 @@ function app() {
     toggleAutoRefresh() {
       if (this._logTimer) { clearInterval(this._logTimer); this._logTimer = null; }
       if (this.logAutoRefresh) this._logTimer = setInterval(() => this.fetchLogs(), 5000);
+    },
+
+    async reboot() {
+      if (!confirm("Reboot the system now?")) return;
+      await apiFetch("/reboot", { method: "POST" });
     },
 
     async saveSettings() {
