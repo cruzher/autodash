@@ -1157,7 +1157,7 @@ class SiteMonitor:
                     seconds_since_refresh = 0
                 else:
                     self.log.debug("Session check ...")
-                    if not await self.is_logged_in():
+                    if self.cfg.auto_login and not await self.is_logged_in():
                         self.log.warning("Session lost - re-logging in.")
                         await self.navigate_and_login()
             except PlaywrightError as exc:
