@@ -805,47 +805,6 @@ class SiteMonitor:
             if settled:
                 self._stable_geom = settled
 
-    async def _launch_fullscreen_window(self, url: str):
-        """Close the current context and open a new fullscreen window at url."""
-        if self.context:
-            try:
-                await self.context.close()
-            except Exception:
-                pass
-            self.context      = None
-            self.page         = None
-            self._window_id   = None
-            self._stable_geom = None
-
-        launch_env = {"DISPLAY": os.environ.get("DISPLAY", ":0")} if IS_LINUX else {}
-
-        self.context = await self.pw.chromium.launch_persistent_context(
-            user_data_dir       = str(self.profile_dir),
-            headless            = False,
-            args                = [
-                f"--app={url}",
-                "--start-fullscreen",
-                "--disable-infobars",
-                "--test-type",
-                "--no-default-browser-check",
-                "--no-first-run",
-                "--disable-extensions",
-                "--password-store=basic",
-            ],
-            ignore_default_args = ["--enable-automation"],
-            no_viewport         = True,
-            ignore_https_errors = True,
-            env                 = launch_env,
-        )
-
-        self._closed = False
-        self.context.on("close", self._on_context_closed)
-        pages = self.context.pages
-        self.page = pages[0] if pages else await self.context.new_page()
-
-    async def _launch_offline_context(self):
-        await self._launch_fullscreen_window(_OFFLINE_URL)
-
     async def close_window(self):
         """Close the browser window. Called by the schedule coordinator."""
         self._closed = True   # suppress the "will reopen" warning from _on_context_closed
@@ -865,14 +824,17 @@ class SiteMonitor:
     async def _show_offline_page(self):
         if self._showing_offline:
             return
-        self.log.warning("Internet unavailable - opening fullscreen offline window.")
+        self.log.warning("Internet unavailable - showing notice in dashboard window.")
         self._showing_offline = True
-        await self._launch_offline_context()
+        try:
+            await self.page.goto(_OFFLINE_URL, wait_until="load", timeout=10_000)
+        except Exception as exc:
+            if not is_closed_error(exc):
+                self.log.debug("Offline page navigation (non-fatal): %s", exc)
 
     async def _restore_from_offline(self):
-        self.log.info("Internet restored - reopening dashboard window.")
+        self.log.info("Internet restored - resuming.")
         self._showing_offline = False
-        await self._launch_context()
         await self.navigate_and_login()
 
     async def _playwright_availability_check(self) -> bool:
