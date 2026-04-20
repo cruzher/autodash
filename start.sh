@@ -18,6 +18,13 @@ echo " autodash"
 echo "========================================="
 echo ""
 
+# -- Pull latest code from git ---------------------------------------------
+AUTO_UPDATE=$(python3 -c "import json,pathlib; s=pathlib.Path('settings.json'); print(json.loads(s.read_text()).get('auto_update', True) if s.exists() else True)" 2>/dev/null || echo "True")
+if [ "$AUTO_UPDATE" = "True" ] && command -v git >/dev/null 2>&1 && [ -d ".git" ]; then
+    echo "[..] Pulling latest code ..."
+    git pull --ff-only 2>&1 && echo "[OK] Up to date." || echo "[WARN] git pull failed — continuing with current version."
+fi
+
 # -- xdotool (Linux, window positioning) -----------------------------------
 if ! command -v xdotool >/dev/null 2>&1; then
     if command -v apt-get >/dev/null 2>&1; then

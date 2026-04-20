@@ -111,7 +111,7 @@ async def api_put_sites(request: Request, _: None = Depends(require_auth)):
     return {"ok": True}
 
 
-_DEFAULT_SETTINGS = {"refresh_interval": 600, "sleep_when_idle": True, "heartbeat_url": "", "heartbeat_interval": 60}
+_DEFAULT_SETTINGS = {"refresh_interval": 600, "sleep_when_idle": True, "heartbeat_url": "", "heartbeat_interval": 60, "auto_update": True}
 
 
 def _load_settings() -> dict:
@@ -161,6 +161,20 @@ def api_get_sysinfo(_: None = Depends(require_auth)):
         "hostname":   platform.node(),
         "python":     sys.version.split()[0],
     })
+
+
+@api.post("/update")
+def api_update(_: None = Depends(require_auth)):
+    try:
+        result = subprocess.run(
+            ["git", "pull", "--ff-only"],
+            capture_output=True, text=True, timeout=60,
+            cwd=Path(__file__).parent,
+        )
+        output = (result.stdout + result.stderr).strip()
+        return JSONResponse(content={"ok": result.returncode == 0, "output": output})
+    except Exception as exc:
+        return JSONResponse(content={"ok": False, "output": str(exc)})
 
 
 @api.post("/reboot")
