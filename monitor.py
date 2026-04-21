@@ -991,6 +991,13 @@ class SiteMonitor:
         self.log.info("Attempting login ...")
         if self.cfg.login_steps:
             await self._login_with_steps()
+            try:
+                await self.page.wait_for_load_state("networkidle", timeout=15_000)
+            except PlaywrightTimeoutError:
+                pass
+            await asyncio.sleep(5)
+            self.log.info("Login steps completed.")
+            await self._maybe_goto_post_login()
         else:
             username_field = await self._find_element(
                 [self.cfg.username_selector] + self.cfg.extra_username_selectors
@@ -1014,16 +1021,16 @@ class SiteMonitor:
             else:
                 self.log.warning("Submit button not found - pressing Enter.")
                 await password_field.press("Enter")
-        try:
-            await self.page.wait_for_load_state("networkidle", timeout=15_000)
-        except PlaywrightTimeoutError:
-            pass
-        await asyncio.sleep(2)
-        if await self.is_logged_in():
-            self.log.info("Login successful.")
-            await self._maybe_goto_post_login()
-        else:
-            self.log.warning("Login may have failed - check credentials/selectors in the config UI.")
+            try:
+                await self.page.wait_for_load_state("networkidle", timeout=15_000)
+            except PlaywrightTimeoutError:
+                pass
+            await asyncio.sleep(2)
+            if await self.is_logged_in():
+                self.log.info("Login successful.")
+                await self._maybe_goto_post_login()
+            else:
+                self.log.warning("Login may have failed - check credentials/selectors in the config UI.")
 
     async def _maybe_goto_post_login(self):
         if not self.cfg.post_login_url:
@@ -1051,14 +1058,20 @@ class SiteMonitor:
             if self.cfg.logged_in_selector:
                 el = await self.page.query_selector(self.cfg.logged_in_selector)
                 if el:
+                    self.log.info("is_logged_in: yes — selector '%s' found on %s", self.cfg.logged_in_selector, self.page.url)
                     return True
+                self.log.info("is_logged_in: no — selector '%s' not found on %s", self.cfg.logged_in_selector, self.page.url)
             if self.cfg.logged_in_url_fragment:
                 if self.cfg.logged_in_url_fragment in self.page.url:
+                    self.log.info("is_logged_in: yes — URL fragment '%s' matched in %s", self.cfg.logged_in_url_fragment, self.page.url)
                     return True
+                self.log.info("is_logged_in: no — URL fragment '%s' not found in %s", self.cfg.logged_in_url_fragment, self.page.url)
             if not self.cfg.logged_in_selector and not self.cfg.logged_in_url_fragment:
                 pw_field = await self.page.query_selector(self.cfg.password_selector)
                 if pw_field is None:
+                    self.log.info("is_logged_in: yes — password selector '%s' absent from %s (fallback)", self.cfg.password_selector, self.page.url)
                     return True
+                self.log.info("is_logged_in: no — password selector '%s' still present on %s (fallback)", self.cfg.password_selector, self.page.url)
         except Exception as exc:
             self.log.debug("is_logged_in check error (non-fatal): %s", exc)
         return False

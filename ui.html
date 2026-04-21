@@ -65,6 +65,7 @@
               border-radius: 4px; font-size: 12px; }
   .icon-btn:hover { background: #f3f4f6; color: #374151; }
   .icon-btn.danger:hover { background: #fee2e2; color: #dc2626; }
+  .icon-btn:disabled { opacity: 0.25; cursor: default; pointer-events: none; }
   .card-body { padding: 16px; border-top: 1px solid #f3f4f6; }
 
   /* ---- fields ---- */
@@ -304,6 +305,8 @@
                         </div>
                       </template>
                       <input x-show="step.action === 'press'" x-model="step.value" placeholder="key (e.g. Enter)">
+                      <button class="icon-btn" @click="li > 0 && site.login_steps.splice(li-1, 0, site.login_steps.splice(li,1)[0])" :disabled="li === 0" title="Move up">&#9650;</button>
+                      <button class="icon-btn" @click="li < site.login_steps.length-1 && site.login_steps.splice(li+1, 0, site.login_steps.splice(li,1)[0])" :disabled="li === site.login_steps.length-1" title="Move down">&#9660;</button>
                       <button class="icon-btn danger" @click="site.login_steps.splice(li,1)" title="Remove">&#10005;</button>
                     </div>
                   </template>
