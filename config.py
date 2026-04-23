@@ -43,6 +43,7 @@ class SiteConfig:
     # Optional: navigate to this URL after a successful login.
     # Leave empty to stay on whatever page the site lands on after login.
     post_login_url: str = ""
+    post_login_enabled: bool = False
 
     # ── Login-form selectors (CSS) ───────────────────────────────────────────
     username_selector: str = (
@@ -77,6 +78,10 @@ class SiteConfig:
     # Each LoginStep is one action: fill a field, click an element, or wait
     # for an element to appear. Leave empty to use the simple flow (default).
     login_steps: list = field(default_factory=list)
+
+    # ── Post-login steps ─────────────────────────────────────────────────────
+    # Actions to run after login is verified and post_login_url navigated to.
+    post_login_steps: list = field(default_factory=list)
 
     # ── Availability check ───────────────────────────────────────────────────
     # Set to False to disable availability checking entirely for this site.
@@ -116,11 +121,12 @@ def load_sites_json(path) -> list:
     for s in data:
         s = dict(s)
         steps = [LoginStep(**step) for step in s.pop("login_steps", [])]
+        post_login_steps = [LoginStep(**step) for step in s.pop("post_login_steps", [])]
         # schedule entries are stored as lists in JSON; convert back to tuples
         schedule = [tuple(entry) for entry in s.pop("schedule", [])]
         known = {f.name for f in fields(SiteConfig)}
         s = {k: v for k, v in s.items() if k in known}
-        sites.append(SiteConfig(**s, login_steps=steps, schedule=schedule))
+        sites.append(SiteConfig(**s, login_steps=steps, post_login_steps=post_login_steps, schedule=schedule))
     return sites
 
 

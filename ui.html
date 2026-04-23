@@ -273,9 +273,6 @@
               </div>
               <div x-show="site.auto_login">
                 <p class="hint" style="margin-top:8px;">autodash will detect the login form using standard selectors and fill in your credentials automatically. For sites with non-standard login flows, use <strong>Multi-step login</strong> below instead.</p>
-                <div class="field-grid" style="margin-top:10px;">
-                  <div class="field"><label>Post-login URL</label><input x-model="site.post_login_url" placeholder="leave empty to stay on landing page"></div>
-                </div>
                 <div class="field-grid two" style="margin-top:10px;">
                   <div class="field"><label>Logged-in selector</label><input x-model="site.logged_in_selector" placeholder="CSS selector only present when logged in"></div>
                   <div class="field"><label>Logged-in URL fragment</label><input x-model="site.logged_in_url_fragment" placeholder="/dashboard"></div>
@@ -312,6 +309,48 @@
                   </template>
                 </div>
                 <button class="add-row-btn" @click="site.login_steps.push({action:'fill',selector:'',value:''})">+ Add step</button>
+              </div>
+
+              <!-- Post Login -->
+              <div class="section-title">Post Login</div>
+              <div class="field-grid">
+                <div class="field checkbox-row"><input type="checkbox" x-model="site.post_login_enabled" :id="'pl-'+si"><label :for="'pl-'+si">Enable post login</label></div>
+              </div>
+              <div x-show="site.post_login_enabled">
+                <div class="field-grid" style="margin-top:10px;">
+                  <div class="field"><label>Post-login URL</label><input x-model="site.post_login_url" placeholder="leave empty to stay on landing page"></div>
+                </div>
+                <!-- post_login_steps -->
+                <div class="section-title" style="margin-top:14px;">Post-login steps <span style="text-transform:none;font-weight:400;color:#9ca3af;font-size:10px;letter-spacing:0;">— actions to run after login is verified and post-login URL loaded</span></div>
+                <div class="dynamic-rows">
+                  <template x-for="(step, li) in site.post_login_steps" :key="li">
+                    <div class="dynamic-row">
+                      <select x-model="step.action">
+                        <option value="fill">fill</option>
+                        <option value="click">click</option>
+                        <option value="wait_for">wait_for</option>
+                        <option value="press">press</option>
+                      </select>
+                      <input x-model="step.selector" placeholder="CSS selector (optional for press)">
+                      <template x-if="step.action === 'fill'">
+                        <div style="display:contents">
+                          <select :value="['{username}','{password}','{totp}'].includes(step.value) ? step.value : 'custom'" @change="step.value = $event.target.value === 'custom' ? '' : $event.target.value">
+                            <option value="{username}">username</option>
+                            <option value="{password}">password</option>
+                            <option value="{totp}">totp</option>
+                            <option value="custom">custom</option>
+                          </select>
+                          <input x-show="!['{username}','{password}','{totp}'].includes(step.value)" x-model="step.value" placeholder="custom value">
+                        </div>
+                      </template>
+                      <input x-show="step.action === 'press'" x-model="step.value" placeholder="key (e.g. Enter)">
+                      <button class="icon-btn" @click="li > 0 && site.post_login_steps.splice(li-1, 0, site.post_login_steps.splice(li,1)[0])" :disabled="li === 0" title="Move up">&#9650;</button>
+                      <button class="icon-btn" @click="li < site.post_login_steps.length-1 && site.post_login_steps.splice(li+1, 0, site.post_login_steps.splice(li,1)[0])" :disabled="li === site.post_login_steps.length-1" title="Move down">&#9660;</button>
+                      <button class="icon-btn danger" @click="site.post_login_steps.splice(li,1)" title="Remove">&#10005;</button>
+                    </div>
+                  </template>
+                </div>
+                <button class="add-row-btn" @click="site.post_login_steps.push({action:'fill',selector:'',value:''})">+ Add step</button>
               </div>
 
               <!-- Availability -->
@@ -481,6 +520,7 @@ function defaultSite() {
     window_width: 1280,
     window_height: 900,
     post_login_url: "",
+    post_login_enabled: false,
     auto_login: true,
     username_selector: "input[type='text'], input[name='username'], input[name='email'], input[id*='user'], input[id*='email']",
     password_selector: "input[type='password']",
@@ -488,6 +528,7 @@ function defaultSite() {
     extra_username_selectors: [],
     extra_password_selectors: [],
     login_steps: [],
+    post_login_steps: [],
     logged_in_selector: "",
     logged_in_url_fragment: "",
     availability_check: true,
@@ -537,7 +578,7 @@ function app() {
         const res = await apiFetch("/sites");
         if (!res) return;
         const data = await res.json();
-        this.sites = data.map(s => ({ _open: false, ...s }));
+        this.sites = data.map(s => ({ _open: false, login_steps: [], post_login_steps: [], ...s }));
         if (this.sites.length) this.sites[0]._open = true;
         this.setStatus("Loaded", "ok");
       } catch(e) {
@@ -616,7 +657,7 @@ function app() {
         const text = await file.text();
         const data = JSON.parse(text);
         if (!Array.isArray(data)) throw new Error("Expected a JSON array");
-        this.sites = data.map(s => ({ _open: false, ...s }));
+        this.sites = data.map(s => ({ _open: false, login_steps: [], post_login_steps: [], ...s }));
         this.setStatus(`Imported ${data.length} site(s). Click Save to apply.`, "ok");
       } catch (e) {
         this.setStatus("Import failed: " + e.message, "err");

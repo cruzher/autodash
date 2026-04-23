@@ -1033,23 +1033,79 @@ class SiteMonitor:
                 self.log.warning("Login may have failed - check credentials/selectors in the config UI.")
 
     async def _maybe_goto_post_login(self):
-        if not self.cfg.post_login_url:
+        if not self.cfg.post_login_enabled:
             return
-        if self.page.url.rstrip("/") == self.cfg.post_login_url.rstrip("/"):
-            return
-        self.log.info("Navigating to post-login URL: %s", self.cfg.post_login_url)
-        try:
-            await self.page.goto(
-                self.cfg.post_login_url, wait_until="networkidle", timeout=30_000
-            )
-            if not self.cfg.fullscreen:
-                await fit_viewport_to_window(self.page)
-        except PlaywrightTimeoutError:
-            self.log.warning("Post-login navigation timed out - continuing anyway.")
-        except Exception as exc:
-            if is_closed_error(exc):
-                raise
-            self.log.warning("Post-login navigation warning: %s", exc)
+        if self.cfg.post_login_url:
+            if self.page.url.rstrip("/") == self.cfg.post_login_url.rstrip("/"):
+                pass
+            else:
+                self.log.info("Navigating to post-login URL: %s", self.cfg.post_login_url)
+                try:
+                    await self.page.goto(
+                        self.cfg.post_login_url, wait_until="networkidle", timeout=30_000
+                    )
+                    if not self.cfg.fullscreen:
+                        await fit_viewport_to_window(self.page)
+                except PlaywrightTimeoutError:
+                    self.log.warning("Post-login navigation timed out - continuing anyway.")
+                except Exception as exc:
+                    if is_closed_error(exc):
+                        raise
+                    self.log.warning("Post-login navigation warning: %s", exc)
+        if self.cfg.post_login_steps:
+            await self._run_post_login_steps()
+
+    async def _run_post_login_steps(self):
+        totp_token = pyotp.TOTP(self.cfg.totp_secret).now() if self.cfg.totp_secret else ""
+        subs = {"{username}": self.cfg.username, "{password}": self.cfg.password, "{totp}": totp_token}
+        for step in self.cfg.post_login_steps:
+            value = step.value
+            for k, v in subs.items():
+                value = value.replace(k, v)
+
+            if step.action == "fill":
+                loc = self._resolve_locator(step.selector).first
+                try:
+                    await loc.wait_for(state="visible", timeout=30_000)
+                    await loc.click()
+                    await loc.fill(value)
+                except PlaywrightTimeoutError:
+                    self.log.error("Post-login step: timed out waiting for: %s (url: %s)", step.selector, self.page.url)
+                    return
+
+            elif step.action == "click":
+                loc = self._resolve_locator(step.selector).first
+                try:
+                    await loc.wait_for(state="visible", timeout=30_000)
+                    await loc.click()
+                    await asyncio.sleep(1)
+                except PlaywrightTimeoutError:
+                    self.log.error("Post-login step: timed out waiting for: %s (url: %s)", step.selector, self.page.url)
+                    return
+
+            elif step.action == "press":
+                if step.selector:
+                    loc = self._resolve_locator(step.selector).first
+                    try:
+                        await loc.wait_for(state="visible", timeout=30_000)
+                        await loc.press(value or "Enter")
+                    except PlaywrightTimeoutError:
+                        self.log.error("Post-login step: timed out waiting for: %s (url: %s)", step.selector, self.page.url)
+                        return
+                else:
+                    await self.page.keyboard.press(value or "Enter")
+                await asyncio.sleep(1)
+
+            elif step.action == "wait_for":
+                loc = self._resolve_locator(step.selector)
+                try:
+                    await loc.first.wait_for(state="visible", timeout=30_000)
+                except PlaywrightTimeoutError:
+                    self.log.error("Post-login step: timed out waiting for: %s (url: %s)", step.selector, self.page.url)
+                    return
+
+            else:
+                self.log.warning("Post-login step: unknown action '%s' — skipping.", step.action)
 
     async def is_logged_in(self):
         try:
