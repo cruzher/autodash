@@ -109,6 +109,12 @@ class SiteConfig:
     #   schedule = [("09:00", "17:00")]        # every day, 9 to 5
     schedule: list = field(default_factory=list)
 
+    # ── Page refresh ─────────────────────────────────────────────────────────
+    # Set auto_refresh to False to disable automatic page reloading for this site.
+    # refresh_interval is how often (in seconds) the page is reloaded; min 60.
+    auto_refresh:     bool = True
+    refresh_interval: int  = 600
+
 
 # ---------------------------------------------------------------------------
 # JSON serialisation helpers

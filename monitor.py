@@ -111,7 +111,7 @@ async def api_put_sites(request: Request, _: None = Depends(require_auth)):
     return {"ok": True}
 
 
-_DEFAULT_SETTINGS = {"refresh_interval": 600, "sleep_when_idle": True, "heartbeat_url": "", "heartbeat_interval": 60, "auto_update": True}
+_DEFAULT_SETTINGS = {"sleep_when_idle": True, "heartbeat_url": "", "heartbeat_interval": 60, "auto_update": True}
 
 
 def _load_settings() -> dict:
@@ -129,8 +129,7 @@ _heartbeat_interval = 60
 
 
 def _apply_settings(s: dict) -> None:
-    global REFRESH_INTERVAL_SECONDS, _sleep_when_idle, _heartbeat_url, _heartbeat_interval
-    REFRESH_INTERVAL_SECONDS = max(60, int(s.get("refresh_interval", 600)))
+    global _sleep_when_idle, _heartbeat_url, _heartbeat_interval
     _sleep_when_idle    = bool(s.get("sleep_when_idle", True))
     _heartbeat_url      = str(s.get("heartbeat_url", "") or "")
     _heartbeat_interval = max(10, int(s.get("heartbeat_interval", 60)))
@@ -1183,7 +1182,8 @@ class SiteMonitor:
                 if self._seconds_since_pos_check >= POSITION_CHECK_SECONDS:
                     await self._check_window_position()
                     self._seconds_since_pos_check = 0
-                if seconds_since_refresh >= REFRESH_INTERVAL_SECONDS:
+                refresh_interval = max(60, self.cfg.refresh_interval)
+                if self.cfg.auto_refresh and seconds_since_refresh >= refresh_interval:
                     await self.refresh()
                     seconds_since_refresh = 0
                 else:

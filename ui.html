@@ -385,6 +385,24 @@
               <button class="add-row-btn" @click="site.schedule.push(['Mon-Fri','09:00','17:00'])">+ Add window</button>
               <p style="font-size:11px;color:#9ca3af;margin-top:6px;">Day specs: Mon-Fri &nbsp;|&nbsp; Sat,Sun &nbsp;|&nbsp; Mon &nbsp;|&nbsp; * &nbsp; — overnight ranges supported</p>
 
+              <!-- Page refresh -->
+              <div class="section-title">Page refresh</div>
+              <div class="field-grid">
+                <div class="field checkbox-row"><input type="checkbox" x-model="site.auto_refresh" :id="'ar-'+si"><label :for="'ar-'+si">Auto refresh</label></div>
+              </div>
+              <div x-show="site.auto_refresh" style="margin-top:10px;">
+                <div class="field-grid" style="grid-template-columns:1fr 1fr;">
+                  <div class="field">
+                    <label>Refresh interval (seconds)</label>
+                    <input type="number" min="60" step="30" x-model.number="site.refresh_interval">
+                  </div>
+                  <div class="field" style="justify-content:flex-end;">
+                    <label style="visibility:hidden;">-</label>
+                    <p class="hint">How often this site's page is reloaded. Minimum 60 s.</p>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
         </template>
@@ -424,17 +442,6 @@
               <template x-if="!sysinfo">
                 <span style="color:#9ca3af;font-size:12px;">Loading…</span>
               </template>
-            </div>
-            <div class="section-title">Page refresh</div>
-            <div class="field-grid" style="grid-template-columns:1fr 1fr;">
-              <div class="field">
-                <label>Refresh interval (seconds)</label>
-                <input type="number" min="60" step="30" x-model.number="settings.refresh_interval">
-              </div>
-              <div class="field" style="justify-content:flex-end;">
-                <label style="visibility:hidden;">-</label>
-                <p class="hint">How often each site page is reloaded. Minimum 60 s.</p>
-              </div>
             </div>
             <div class="section-title">Display</div>
             <div class="field checkbox-row">
@@ -535,6 +542,8 @@ function defaultSite() {
     availability_check_mode: "http",
     availability_check_selector: "",
     schedule: [],
+    auto_refresh: true,
+    refresh_interval: 600,
   };
 }
 
@@ -553,7 +562,7 @@ function app() {
     saving: false,
     statusMsg: "",
     statusClass: "",
-    settings: { refresh_interval: 600, sleep_when_idle: true, heartbeat_url: "", heartbeat_interval: 60, auto_update: true },
+    settings: { sleep_when_idle: true, heartbeat_url: "", heartbeat_interval: 60, auto_update: true },
     sysinfo: null,
     updating: false,
     updateOutput: "",
