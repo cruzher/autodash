@@ -108,6 +108,9 @@
   .log-line.debug { color: #6b7280; }
   .log-empty { color: #4b5563; font-size: 13px; padding: 20px 0; }
 
+  /* ---- modal overlay ---- */
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; z-index:100; }
+
   /* ---- hint text ---- */
   .hint { font-size: 12px; color: #9ca3af; margin-top: 8px; line-height: 1.5; }
   .hint strong { color: #6b7280; }
@@ -179,39 +182,12 @@
     <div style="display:flex;flex-direction:column;flex:1;">
       <div class="topbar">
         <h2>Home</h2>
-        <div class="topbar-actions">
-          <span class="status" :class="screenshotUpdated ? 'ok' : ''" x-text="screenshotUpdated"></span>
-          <button class="btn-secondary" @click="fetchScreenshots()">Refresh</button>
-        </div>
       </div>
       <div class="page">
 
-        <!-- Remote input -->
-        <div class="site-card">
-          <div class="card-header" style="cursor:default;">
-            <div class="card-title">Remote Input</div>
-            <span x-show="remoteFeedback" x-text="remoteFeedback"
-                  style="font-size:12px;color:#34d399;"></span>
-          </div>
-          <div class="card-body">
-            <div style="display:flex;gap:8px;margin-bottom:8px;">
-              <input x-model="remoteText"
-                     placeholder="Type text to send…"
-                     style="flex:1;"
-                     @keydown.enter="sendText()">
-              <button class="btn-primary" @click="sendText()" :disabled="!remoteText">Send</button>
-            </div>
-            <div style="display:flex;gap:6px;">
-              <button class="btn-secondary" @click="sendKey('f11')">F11</button>
-              <button class="btn-secondary" @click="sendKey('super')">Win</button>
-              <button class="btn-secondary" @click="sendKey('escape')">Esc</button>
-            </div>
-          </div>
-        </div>
-
         <!-- Monitor selector (only shown when more than one monitor is detected) -->
         <template x-if="monitors.length > 1">
-          <div style="margin:8px 0;display:flex;align-items:center;gap:8px;">
+          <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
             <label style="font-size:13px;color:#9ca3af;">Monitor</label>
             <select x-model.number="selectedMonitor" @change="fetchScreenshots()"
                     style="background:#1f2937;color:#f9fafb;border:1px solid #374151;border-radius:4px;padding:4px 8px;font-size:13px;">
@@ -222,13 +198,24 @@
           </div>
         </template>
 
-        <!-- Display card — click the image to send a click to the remote machine -->
-        <div class="site-card" style="margin-top:8px;">
+        <!-- Display card -->
+        <div class="site-card">
           <div class="card-header" style="cursor:default;">
-            <div class="card-title">Display</div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span x-show="clickFeedback" x-text="clickFeedback"
+            <!-- Left: remote control buttons -->
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <button class="btn-secondary" @click="sendKey('f11')">F11</button>
+              <button class="btn-secondary" @click="sendKey('super')">Win</button>
+              <button class="btn-secondary" @click="sendKey('escape')">Esc</button>
+              <button class="btn-secondary" @click="showTextPopup = true; $nextTick(() => $refs.textInput.focus())">Send text</button>
+              <span x-show="remoteFeedback || clickFeedback"
+                    x-text="remoteFeedback || clickFeedback"
                     style="font-size:12px;color:#34d399;"></span>
+            </div>
+            <!-- Right: updated timestamp + refresh + live status -->
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span x-show="screenshotUpdated" x-text="screenshotUpdated"
+                    style="font-size:12px;color:#9ca3af;"></span>
+              <button class="btn-secondary" @click="fetchScreenshots()">Refresh</button>
               <span class="status" :class="screenshotError ? 'err' : 'ok'"
                     x-text="screenshotError || 'live'"></span>
             </div>
@@ -250,6 +237,27 @@
         </div>
 
       </div>
+
+      <!-- Send text popup -->
+      <div x-show="showTextPopup" class="modal-overlay" @click.self="showTextPopup = false">
+        <div class="site-card" style="width:420px;max-width:90vw;margin:0;">
+          <div class="card-header" style="cursor:default;">
+            <div class="card-title">Send text</div>
+            <button class="icon-btn" @click="showTextPopup = false" title="Close">&#10005;</button>
+          </div>
+          <div class="card-body">
+            <textarea x-model="remoteText"
+                      x-ref="textInput"
+                      placeholder="Type text to send…"
+                      rows="6"
+                      style="width:100%;border:1px solid #d1d5db;border-radius:5px;padding:6px 8px;color:#111827;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
+            <div style="margin-top:10px;display:flex;justify-content:flex-end;">
+              <button class="btn-primary" @click="sendText()" :disabled="!remoteText">Send</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </template>
 
@@ -628,6 +636,7 @@ function app() {
     _screenshotTimer: null,
     monitors: [],
     selectedMonitor: 1,
+    showTextPopup: false,
     remoteText: "",
     remoteFeedback: "",
     _remoteFeedbackTimer: null,
@@ -716,7 +725,7 @@ function app() {
       clearTimeout(this._remoteFeedbackTimer);
       this.remoteFeedback = res && res.ok ? "Sent" : "Failed";
       this._remoteFeedbackTimer = setTimeout(() => this.remoteFeedback = "", 1500);
-      if (res && res.ok) this.remoteText = "";
+      if (res && res.ok) { this.remoteText = ""; this.showTextPopup = false; }
     },
 
     async sendKey(key) {
