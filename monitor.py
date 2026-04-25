@@ -53,6 +53,10 @@ class TypeRequest(BaseModel):
     text: str
 
 
+class KeyRequest(BaseModel):
+    key: str
+
+
 # ---- TIMING CONFIGURATION -----------------------------------------------
 
 REFRESH_INTERVAL_SECONDS  = 600   # mutable — updated by settings API at runtime
@@ -356,6 +360,22 @@ async def api_type(req: TypeRequest, _: None = Depends(require_auth)):
     try:
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, _type)
+        return {"ok": True}
+    except Exception as exc:
+        return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+
+@api.post("/key")
+async def api_key(req: KeyRequest, _: None = Depends(require_auth)):
+    """Simulate a single special key press."""
+    import pyautogui
+
+    def _press():
+        pyautogui.press(req.key)
+
+    try:
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, _press)
         return {"ok": True}
     except Exception as exc:
         return JSONResponse(status_code=500, content={"detail": str(exc)})
