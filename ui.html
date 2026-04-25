@@ -185,14 +185,37 @@
         </div>
       </div>
       <div class="page">
+
+        <!-- Monitor selector (only shown when more than one monitor is detected) -->
+        <template x-if="monitors.length > 1">
+          <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
+            <label style="font-size:13px;color:#9ca3af;">Monitor</label>
+            <select x-model.number="selectedMonitor" @change="fetchScreenshots()"
+                    style="background:#1f2937;color:#f9fafb;border:1px solid #374151;border-radius:4px;padding:4px 8px;font-size:13px;">
+              <template x-for="m in monitors" :key="m.index">
+                <option :value="m.index" x-text="m.label"></option>
+              </template>
+            </select>
+          </div>
+        </template>
+
+        <!-- Display card — click the image to send a click to the remote machine -->
         <div class="site-card">
           <div class="card-header" style="cursor:default;">
             <div class="card-title">Display</div>
-            <span class="status" :class="screenshotError ? 'err' : 'ok'" x-text="screenshotError || 'live'"></span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span x-show="clickFeedback" x-text="clickFeedback"
+                    style="font-size:12px;color:#34d399;"></span>
+              <span class="status" :class="screenshotError ? 'err' : 'ok'"
+                    x-text="screenshotError || 'live'"></span>
+            </div>
           </div>
           <div style="background:#111827;border-radius:0 0 8px 8px;overflow:hidden;line-height:0;">
             <template x-if="screenshotSrc">
-              <img :src="screenshotSrc" style="max-width:100%;height:auto;display:block;" alt="Display screenshot">
+              <img :src="screenshotSrc"
+                   style="max-width:100%;height:auto;display:block;cursor:crosshair;"
+                   alt="Display screenshot"
+                   @click="sendClick($event)">
             </template>
             <template x-if="!screenshotSrc && screenshotError">
               <div style="padding:40px;text-align:center;color:#6b7280;font-size:13px;" x-text="screenshotError"></div>
@@ -202,6 +225,25 @@
             </template>
           </div>
         </div>
+
+        <!-- Remote text input -->
+        <div class="site-card" style="margin-top:8px;">
+          <div class="card-header" style="cursor:default;">
+            <div class="card-title">Remote Input</div>
+            <span x-show="remoteFeedback" x-text="remoteFeedback"
+                  style="font-size:12px;color:#34d399;"></span>
+          </div>
+          <div class="card-body">
+            <div style="display:flex;gap:8px;">
+              <input x-model="remoteText"
+                     placeholder="Type text to send…"
+                     style="flex:1;"
+                     @keydown.enter="sendText()">
+              <button class="btn-primary" @click="sendText()" :disabled="!remoteText">Send</button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </template>
@@ -579,6 +621,13 @@ function app() {
     screenshotError: null,
     screenshotUpdated: "",
     _screenshotTimer: null,
+    monitors: [],
+    selectedMonitor: 1,
+    remoteText: "",
+    remoteFeedback: "",
+    _remoteFeedbackTimer: null,
+    clickFeedback: "",
+    _clickFeedbackTimer: null,
     schedDayHint: "Day spec: Mon-Fri, Sat,Sun, Mon, * (every day)",
     schedTimeHint: "Time in HH:MM format, e.g. 09:00",
 
@@ -605,12 +654,15 @@ function app() {
       this._screenshotTimer = setInterval(() => {
         if (this.page === 'home') this.fetchScreenshots();
       }, 10000);
-      if (this.page === 'home') this.fetchScreenshots();
+      if (this.page === 'home') {
+        this.fetchScreenshots();
+        this.fetchMonitors();
+      }
     },
 
     async fetchScreenshots() {
       try {
-        const res = await apiFetch("/screenshot");
+        const res = await apiFetch(`/screenshot?monitor=${this.selectedMonitor}`);
         if (!res) return;
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
@@ -625,6 +677,41 @@ function app() {
       } catch(e) {
         this.screenshotError = e.message;
       }
+    },
+
+    async fetchMonitors() {
+      const res = await apiFetch("/monitors");
+      if (!res || !res.ok) return;
+      this.monitors = await res.json();
+      if (this.monitors.length) this.selectedMonitor = this.monitors[0].index;
+    },
+
+    async sendClick(event) {
+      const img = event.currentTarget;
+      const rect = img.getBoundingClientRect();
+      const x = (event.clientX - rect.left) / rect.width;
+      const y = (event.clientY - rect.top)  / rect.height;
+      const res = await apiFetch("/click", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ x, y, monitor: this.selectedMonitor }),
+      });
+      clearTimeout(this._clickFeedbackTimer);
+      this.clickFeedback = res && res.ok ? "Click sent" : "Click failed";
+      this._clickFeedbackTimer = setTimeout(() => this.clickFeedback = "", 1500);
+    },
+
+    async sendText() {
+      if (!this.remoteText) return;
+      const res = await apiFetch("/type", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: this.remoteText }),
+      });
+      clearTimeout(this._remoteFeedbackTimer);
+      this.remoteFeedback = res && res.ok ? "Sent" : "Failed";
+      this._remoteFeedbackTimer = setTimeout(() => this.remoteFeedback = "", 1500);
+      if (res && res.ok) this.remoteText = "";
     },
 
     async signOut() {

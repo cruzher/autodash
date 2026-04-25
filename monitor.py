@@ -27,6 +27,7 @@ from playwright.async_api import (
 
 from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
+from pydantic import BaseModel
 import uvicorn
 
 from auth import (
@@ -40,6 +41,17 @@ from auth import (
     validate_session,
 )
 from config import SiteConfig, load_sites_json
+
+
+class ClickRequest(BaseModel):
+    x: float          # relative ratio 0.0–1.0
+    y: float          # relative ratio 0.0–1.0
+    monitor: int = 1  # mss monitor index (1 = first physical monitor)
+
+
+class TypeRequest(BaseModel):
+    text: str
+
 
 # ---- TIMING CONFIGURATION -----------------------------------------------
 
@@ -271,15 +283,15 @@ async def api_auth_logout(request: Request):
 
 
 @api.get("/screenshot")
-async def api_screenshot(_: None = Depends(require_auth)):
-    """Return a PNG screenshot of the primary physical display."""
+async def api_screenshot(monitor: int = 1, _: None = Depends(require_auth)):
+    """Return a PNG screenshot of the selected physical display."""
     import mss
     import mss.tools
 
     def _grab():
         with mss.mss() as sct:
-            monitor = sct.monitors[1]  # monitors[0] is the all-screens aggregate
-            frame = sct.grab(monitor)
+            idx = max(1, min(monitor, len(sct.monitors) - 1))
+            frame = sct.grab(sct.monitors[idx])
             return mss.tools.to_png(frame.rgb, frame.size)
 
     try:
@@ -288,6 +300,65 @@ async def api_screenshot(_: None = Depends(require_auth)):
         return Response(content=png, media_type="image/png")
     except Exception as exc:
         return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+
+@api.get("/monitors")
+async def api_monitors(_: None = Depends(require_auth)):
+    """Return the list of physical monitors (excludes index-0 virtual aggregate)."""
+    import mss
+    with mss.mss() as sct:
+        return [
+            {"index": i, "label": f"Monitor {i} ({m['width']}×{m['height']})",
+             "width": m["width"], "height": m["height"]}
+            for i, m in enumerate(sct.monitors)
+            if i > 0
+        ]
+
+
+@api.post("/click")
+async def api_click(req: ClickRequest, _: None = Depends(require_auth)):
+    """Simulate a mouse click at relative coordinates on the selected monitor."""
+    import mss
+    import pyautogui
+
+    def _click():
+        with mss.mss() as sct:
+            idx = max(1, min(req.monitor, len(sct.monitors) - 1))
+            mon = sct.monitors[idx]
+            virtual = sct.monitors[0]
+            # HiDPI: pyautogui uses logical coords; mss reports actual pixels.
+            # Scale factor maps actual pixel space → pyautogui logical space.
+            gui_w, gui_h = pyautogui.size()
+            scale_x = gui_w / virtual["width"]
+            scale_y = gui_h / virtual["height"]
+            abs_x = (mon["left"] + req.x * mon["width"]) * scale_x
+            abs_y = (mon["top"]  + req.y * mon["height"]) * scale_y
+            pyautogui.click(abs_x, abs_y)
+
+    try:
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, _click)
+        return {"ok": True}
+    except Exception as exc:
+        return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+
+@api.post("/type")
+async def api_type(req: TypeRequest, _: None = Depends(require_auth)):
+    """Simulate keyboard input via clipboard paste for full Unicode support."""
+    import pyperclip
+    import pyautogui
+
+    def _type():
+        pyperclip.copy(req.text)
+        pyautogui.hotkey("ctrl", "v")
+
+    try:
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, _type)
+        return {"ok": True}
+    except Exception as exc:
+        return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
 async def check_site_available(url: str) -> bool:

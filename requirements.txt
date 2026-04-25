@@ -4,3 +4,5 @@ uvicorn[standard]
 python-multipart
 mss
 pyotp
+pyautogui
+pyperclip
