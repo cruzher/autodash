@@ -51,6 +51,8 @@ class ClickRequest(BaseModel):
 
 class TypeRequest(BaseModel):
     text: str
+    method: str = "paste"   # "paste" = clipboard ctrl+v, "type" = key-by-key
+    send_enter: bool = False
 
 
 class KeyRequest(BaseModel):
@@ -354,8 +356,13 @@ async def api_type(req: TypeRequest, _: None = Depends(require_auth)):
     import pyautogui
 
     def _type():
-        pyperclip.copy(req.text)
-        pyautogui.hotkey("ctrl", "v")
+        if req.method == "type":
+            pyautogui.write(req.text, interval=0.02)
+        else:
+            pyperclip.copy(req.text)
+            pyautogui.hotkey("ctrl", "v")
+        if req.send_enter:
+            pyautogui.press("enter")
 
     try:
         loop = asyncio.get_running_loop()

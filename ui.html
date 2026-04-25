@@ -252,8 +252,15 @@
                       placeholder="Type text to send…"
                       rows="6"
                       style="width:100%;border:1px solid #d1d5db;border-radius:5px;padding:6px 8px;color:#111827;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
-            <div style="margin-top:10px;display:flex;justify-content:flex-end;">
-              <button class="btn-primary" @click="sendText()" :disabled="!remoteText">Send</button>
+            <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#6b7280;cursor:pointer;">
+                <input type="checkbox" x-model="remoteTextEnter" style="accent-color:#2563eb;">
+                Send Enter after
+              </label>
+              <div style="display:flex;gap:6px;">
+                <button class="btn-secondary" @click="sendText('type')" :disabled="!remoteText">Type text</button>
+                <button class="btn-primary" @click="sendText('paste')" :disabled="!remoteText">Paste text</button>
+              </div>
             </div>
           </div>
         </div>
@@ -639,6 +646,7 @@ function app() {
     selectedMonitor: 1,
     showTextPopup: false,
     remoteText: "",
+    remoteTextEnter: false,
     remoteFeedback: "",
     _remoteFeedbackTimer: null,
     clickFeedback: "",
@@ -716,12 +724,12 @@ function app() {
       this._clickFeedbackTimer = setTimeout(() => this.clickFeedback = "", 1500);
     },
 
-    async sendText() {
+    async sendText(method = "paste") {
       if (!this.remoteText) return;
       const res = await apiFetch("/type", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: this.remoteText }),
+        body: JSON.stringify({ text: this.remoteText, method, send_enter: this.remoteTextEnter }),
       });
       clearTimeout(this._remoteFeedbackTimer);
       this.remoteFeedback = res && res.ok ? "Sent" : "Failed";
