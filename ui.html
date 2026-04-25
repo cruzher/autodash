@@ -206,6 +206,7 @@
               <button class="btn-secondary" @click="sendKey('f11')">F11</button>
               <button class="btn-secondary" @click="sendKey('super')">Win</button>
               <button class="btn-secondary" @click="sendKey('escape')">Esc</button>
+              <button class="btn-secondary" @click="sendKey('enter')">Enter</button>
               <button class="btn-secondary" @click="showTextPopup = true; $nextTick(() => $refs.textInput.focus())">Send text</button>
               <span x-show="remoteFeedback || clickFeedback"
                     x-text="remoteFeedback || clickFeedback"
