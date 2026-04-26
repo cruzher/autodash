@@ -527,6 +527,18 @@
               </div>
             </div>
             <p class="hint" style="margin-top:6px;">When set, autodash will GET the webhook URL at the configured interval so external monitoring services know the system is alive.</p>
+            <div class="section-title">Remote control</div>
+            <div class="field-grid" style="grid-template-columns:1fr 1fr;">
+              <div class="field">
+                <label>Active refresh interval (seconds)</label>
+                <input type="number" min="1" step="1" x-model.number="settings.remote_active_interval">
+              </div>
+              <div class="field">
+                <label>Idle refresh interval (seconds)</label>
+                <input type="number" min="5" step="5" x-model.number="settings.remote_idle_interval">
+              </div>
+            </div>
+            <p class="hint" style="margin-top:6px;">Screenshot refresh rate when remotely controlling (active) vs. when idle. Active mode is triggered by mouse or keyboard input and times out after 10 seconds of inactivity.</p>
             <div class="section-title">Updates</div>
             <div class="field checkbox-row" style="margin-bottom:10px;">
               <input type="checkbox" id="auto-update" x-model="settings.auto_update">
@@ -628,7 +640,7 @@ function app() {
     saving: false,
     statusMsg: "",
     statusClass: "",
-    settings: { sleep_when_idle: true, heartbeat_url: "", heartbeat_interval: 60, auto_update: true },
+    settings: { sleep_when_idle: true, heartbeat_url: "", heartbeat_interval: 60, auto_update: true, remote_active_interval: 2, remote_idle_interval: 30 },
     sysinfo: null,
     updating: false,
     updateOutput: "",
@@ -656,6 +668,8 @@ function app() {
     _clickFeedbackTimer: null,
     keyCapture: false,
     _keyCaptureHandler: null,
+    remoteActive: false,
+    _remoteIdleTimer: null,
     schedDayHint: "Day spec: Mon-Fri, Sat,Sun, Mon, * (every day)",
     schedTimeHint: "Time in HH:MM format, e.g. 09:00",
 
@@ -678,18 +692,41 @@ function app() {
         const res = await apiFetch("/sysinfo");
         if (res) this.sysinfo = await res.json();
       } catch(e) { /* non-critical */ }
-      // Start auto-refresh for home page
-      this._screenshotTimer = setInterval(() => {
-        if (this.page === 'home') this.fetchScreenshots();
-      }, 10000);
       if (this.page === 'home') {
-        this.fetchScreenshots();
+        await this.fetchScreenshots();
         this.fetchMonitors();
       }
-      // Disable keyboard capture when navigating away from home
+      this.scheduleScreenshot();
+      document.addEventListener('visibilitychange', () => this.scheduleScreenshot());
+      // Sync keyboard capture and screenshot scheduler when navigating
       this.$watch('page', (newPage) => {
         if (newPage !== 'home' && this.keyCapture) this.setKeyCapture(false);
+        this.scheduleScreenshot();
       });
+    },
+
+    scheduleScreenshot() {
+      clearTimeout(this._screenshotTimer);
+      if (this.page !== 'home' || document.visibilityState === 'hidden') return;
+      const ms = (this.remoteActive
+        ? (this.settings.remote_active_interval || 2)
+        : (this.settings.remote_idle_interval  || 30)) * 1000;
+      this._screenshotTimer = setTimeout(async () => {
+        await this.fetchScreenshots();
+        this.scheduleScreenshot();
+      }, ms);
+    },
+
+    onRemoteActivity() {
+      if (!this.remoteActive) {
+        this.remoteActive = true;
+        this.scheduleScreenshot();
+      }
+      clearTimeout(this._remoteIdleTimer);
+      this._remoteIdleTimer = setTimeout(() => {
+        this.remoteActive = false;
+        this.scheduleScreenshot();
+      }, 10000);
     },
 
     async fetchScreenshots() {
@@ -719,6 +756,7 @@ function app() {
     },
 
     async sendClick(event) {
+      this.onRemoteActivity();
       const img = event.currentTarget;
       const rect = img.getBoundingClientRect();
       const x = (event.clientX - rect.left) / rect.width;
@@ -734,6 +772,7 @@ function app() {
     },
 
     async sendText(method = "paste") {
+      this.onRemoteActivity();
       if (!this.remoteText) return;
       const res = await apiFetch("/type", {
         method: "POST",
@@ -747,6 +786,7 @@ function app() {
     },
 
     async sendKey(key) {
+      this.onRemoteActivity();
       const res = await apiFetch("/key", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -777,6 +817,7 @@ function app() {
 
       event.preventDefault();
       event.stopPropagation();
+      this.onRemoteActivity();
 
       const KEY_MAP = {
         'Enter': 'enter', 'Escape': 'escape', 'Tab': 'tab',
@@ -811,6 +852,7 @@ function app() {
 
     async sendRightClick(event) {
       event.preventDefault();
+      this.onRemoteActivity();
       const img = event.currentTarget;
       const rect = img.getBoundingClientRect();
       const x = (event.clientX - rect.left) / rect.width;

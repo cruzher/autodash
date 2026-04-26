@@ -130,7 +130,7 @@ async def api_put_sites(request: Request, _: None = Depends(require_auth)):
     return {"ok": True}
 
 
-_DEFAULT_SETTINGS = {"sleep_when_idle": True, "heartbeat_url": "", "heartbeat_interval": 60, "auto_update": True}
+_DEFAULT_SETTINGS = {"sleep_when_idle": True, "heartbeat_url": "", "heartbeat_interval": 60, "auto_update": True, "remote_active_interval": 2, "remote_idle_interval": 30}
 
 
 def _load_settings() -> dict:
