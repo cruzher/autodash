@@ -226,7 +226,10 @@
               <img :src="screenshotSrc"
                    style="max-width:100%;height:auto;display:block;cursor:crosshair;"
                    alt="Display screenshot"
-                   @click="sendClick($event)">
+                   @click="sendClick($event)"
+                   @contextmenu="sendRightClick($event)"
+                   @mouseenter="setKeyCapture(true)"
+                   @mouseleave="setKeyCapture(false)">
             </template>
             <template x-if="!screenshotSrc && screenshotError">
               <div style="padding:40px;text-align:center;color:#6b7280;font-size:13px;" x-text="screenshotError"></div>
@@ -651,6 +654,8 @@ function app() {
     _remoteFeedbackTimer: null,
     clickFeedback: "",
     _clickFeedbackTimer: null,
+    keyCapture: false,
+    _keyCaptureHandler: null,
     schedDayHint: "Day spec: Mon-Fri, Sat,Sun, Mon, * (every day)",
     schedTimeHint: "Time in HH:MM format, e.g. 09:00",
 
@@ -681,6 +686,10 @@ function app() {
         this.fetchScreenshots();
         this.fetchMonitors();
       }
+      // Disable keyboard capture when navigating away from home
+      this.$watch('page', (newPage) => {
+        if (newPage !== 'home' && this.keyCapture) this.setKeyCapture(false);
+      });
     },
 
     async fetchScreenshots() {
@@ -744,8 +753,76 @@ function app() {
         body: JSON.stringify({ key }),
       });
       clearTimeout(this._remoteFeedbackTimer);
-      this.remoteFeedback = res && res.ok ? key + " sent" : "Failed";
+      const label = Array.isArray(key) ? key.join('+') : key;
+      this.remoteFeedback = res && res.ok ? label + " sent" : "Failed";
       this._remoteFeedbackTimer = setTimeout(() => this.remoteFeedback = "", 1500);
+    },
+
+    setKeyCapture(on) {
+      if (on === this.keyCapture) return;
+      this.keyCapture = on;
+      if (on) {
+        this._keyCaptureHandler = (e) => this.handleKeyCapture(e);
+        document.addEventListener('keydown', this._keyCaptureHandler);
+      } else {
+        document.removeEventListener('keydown', this._keyCaptureHandler);
+        this._keyCaptureHandler = null;
+      }
+    },
+
+    handleKeyCapture(event) {
+      if (this.showTextPopup) return;
+      const key = event.key;
+      if (['Control', 'Alt', 'Shift', 'Meta', 'CapsLock', 'NumLock', 'ScrollLock'].includes(key)) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const KEY_MAP = {
+        'Enter': 'enter', 'Escape': 'escape', 'Tab': 'tab',
+        'Backspace': 'backspace', 'Delete': 'delete', 'Insert': 'insert',
+        'ArrowUp': 'up', 'ArrowDown': 'down', 'ArrowLeft': 'left', 'ArrowRight': 'right',
+        'Home': 'home', 'End': 'end', 'PageUp': 'pageup', 'PageDown': 'pagedown',
+        ' ': 'space',
+        'F1': 'f1', 'F2': 'f2', 'F3': 'f3', 'F4': 'f4',
+        'F5': 'f5', 'F6': 'f6', 'F7': 'f7', 'F8': 'f8',
+        'F9': 'f9', 'F10': 'f10', 'F11': 'f11', 'F12': 'f12',
+        'CapsLock': 'capslock', 'NumLock': 'numlock', 'ScrollLock': 'scrolllock',
+        'Pause': 'pause', 'PrintScreen': 'printscreen',
+      };
+
+      const mods = [];
+      if (event.ctrlKey)  mods.push('ctrl');
+      if (event.altKey)   mods.push('alt');
+      if (event.metaKey)  mods.push('super');
+
+      const mapped = KEY_MAP[key];
+      if (mapped) {
+        const keys = mods.length ? [...mods, mapped] : mapped;
+        apiFetch("/key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: keys }) });
+      } else if (key.length === 1) {
+        if (mods.length) {
+          apiFetch("/key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: [...mods, key.toLowerCase()] }) });
+        } else {
+          apiFetch("/type", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: key, method: "type", send_enter: false }) });
+        }
+      }
+    },
+
+    async sendRightClick(event) {
+      event.preventDefault();
+      const img = event.currentTarget;
+      const rect = img.getBoundingClientRect();
+      const x = (event.clientX - rect.left) / rect.width;
+      const y = (event.clientY - rect.top)  / rect.height;
+      const res = await apiFetch("/click", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ x, y, monitor: this.selectedMonitor, button: "right" }),
+      });
+      clearTimeout(this._clickFeedbackTimer);
+      this.clickFeedback = res && res.ok ? "Right-click sent" : "Click failed";
+      this._clickFeedbackTimer = setTimeout(() => this.clickFeedback = "", 1500);
     },
 
     async signOut() {

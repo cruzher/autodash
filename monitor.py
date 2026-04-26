@@ -13,7 +13,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional, Union
 from urllib.parse import quote as _url_quote
 
 from playwright.async_api import (
@@ -47,6 +47,7 @@ class ClickRequest(BaseModel):
     x: float          # relative ratio 0.0–1.0
     y: float          # relative ratio 0.0–1.0
     monitor: int = 1  # mss monitor index (1 = first physical monitor)
+    button: str = "left"  # "left" or "right"
 
 
 class TypeRequest(BaseModel):
@@ -56,7 +57,7 @@ class TypeRequest(BaseModel):
 
 
 class KeyRequest(BaseModel):
-    key: str
+    key: Union[str, List[str]]
 
 
 # ---- TIMING CONFIGURATION -----------------------------------------------
@@ -339,7 +340,7 @@ async def api_click(req: ClickRequest, _: None = Depends(require_auth)):
             scale_y = gui_h / virtual["height"]
             abs_x = (mon["left"] + req.x * mon["width"]) * scale_x
             abs_y = (mon["top"]  + req.y * mon["height"]) * scale_y
-            pyautogui.click(abs_x, abs_y)
+            pyautogui.click(abs_x, abs_y, button=req.button)
 
     try:
         loop = asyncio.get_running_loop()
@@ -374,11 +375,14 @@ async def api_type(req: TypeRequest, _: None = Depends(require_auth)):
 
 @api.post("/key")
 async def api_key(req: KeyRequest, _: None = Depends(require_auth)):
-    """Simulate a single special key press."""
+    """Simulate a key press or hotkey combo."""
     import pyautogui
 
     def _press():
-        pyautogui.press(req.key)
+        if isinstance(req.key, list):
+            pyautogui.hotkey(*req.key)
+        else:
+            pyautogui.press(req.key)
 
     try:
         loop = asyncio.get_running_loop()
