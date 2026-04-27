@@ -60,11 +60,17 @@
     }
 
     .ip-label {
-      margin-top: 2rem;
-      font-size: 0.85rem;
+      position: fixed;
+      bottom: 2rem;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      font-size: 2.5rem;
+      font-weight: 300;
       color: #30363d;
       font-variant-numeric: tabular-nums;
-      letter-spacing: 0.03em;
+      letter-spacing: 0.08em;
+      font-family: "Segoe UI", "SF Pro Display", system-ui, monospace;
     }
   </style>
 </head>
@@ -74,8 +80,8 @@
     <div class="icon">&#x1F4C5;</div>
     <h1>No Dashboard Scheduled</h1>
     <p>The next scheduled dashboard will open automatically.</p>
-    <p class="ip-label" id="ip-label"></p>
   </div>
+  <p class="ip-label" id="ip-label"></p>
   <script>
     const ip = location.hash.slice(1);
     if (ip) document.getElementById("ip-label").textContent = ip;
