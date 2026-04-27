@@ -59,6 +59,61 @@ def check_vcredist() -> None:
         print("      Install manually: https://aka.ms/vs/17/release/vc_redist.x64.exe")
 
 
+def is_raspberry_pi() -> bool:
+    try:
+        model = pathlib.Path("/proc/device-tree/model").read_text(errors="ignore")
+        return "raspberry pi" in model.lower()
+    except OSError:
+        return False
+
+
+def is_wayland() -> bool:
+    return (
+        bool(os.environ.get("WAYLAND_DISPLAY")) or
+        os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland"
+    )
+
+
+def fix_wayland() -> None:
+    """Switch the Pi session to X11 via raspi-config and prompt for reboot."""
+    print("[..] Switching display server to X11 ...")
+    result = run("sudo", "raspi-config", "nonint", "do_wayland", "W1", check=False)
+    if result.returncode != 0:
+        print("[WARN] Could not switch to X11 automatically.")
+        print("       Run manually: sudo raspi-config  →  Advanced Options → Wayland → X11")
+        return
+    print("[OK] X11 configured.")
+    print()
+    print(" A reboot is required to apply the change.")
+    print(" autodash will start automatically after reboot.")
+    print()
+    input(" Press Enter to reboot now, or Ctrl+C to reboot later ...")
+    run("sudo", "reboot", check=False)
+    sys.exit(0)
+
+
+def ensure_pi_defaults() -> None:
+    """On Raspberry Pi: enable autostart and fix Wayland (in that order)."""
+    if not is_raspberry_pi():
+        return
+
+    import autostart
+    if not autostart.is_enabled():
+        print("[..] Raspberry Pi detected — enabling autostart ...")
+        try:
+            autostart.enable()
+            print("[OK] autodash will start automatically after login.")
+        except Exception as exc:
+            print(f"[WARN] Could not enable autostart: {exc}")
+
+    if is_wayland():
+        banner(
+            "Wayland detected — autodash requires X11.\n"
+            "The display server will be switched to X11 now."
+        )
+        fix_wayland()
+
+
 def ensure_xdotool() -> None:
     if shutil.which("xdotool"):
         return
@@ -136,6 +191,7 @@ def main() -> None:
     if IS_WINDOWS:
         check_vcredist()
     else:
+        ensure_pi_defaults()
         ensure_xdotool()
     venv_created  = ensure_venv()
     deps_updated  = install_deps(venv_created)
