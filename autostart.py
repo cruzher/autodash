@@ -70,7 +70,7 @@ _XDG_LEGACY_FILES   = [
 
 
 def _lxsession_entry() -> str:
-    return f"@lxterminal -e {_venv_python()} {_SCRIPT}"
+    return f"@lxterminal -e python3 {_SCRIPT}"
 
 
 def _linux_check() -> bool:
