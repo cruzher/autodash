@@ -106,10 +106,10 @@ class _NoticeWindow:
         if settings.sleep_when_idle:
             enable_display_sleep()
         launch_env = {"DISPLAY": os.environ.get("DISPLAY", ":0")} if IS_LINUX else {}
-        try:
-            ip  = _get_local_ip()
+        ip  = _get_local_ip()
         url = self._URL + ("#" + ip if ip else "")
-        self._context = await self._pw.chromium.launch_persistent_context(
+        try:
+            self._context = await self._pw.chromium.launch_persistent_context(
                 user_data_dir       = str(Path(tempfile.mkdtemp(prefix="pw_notice_"))),
                 headless            = False,
                 args                = [
