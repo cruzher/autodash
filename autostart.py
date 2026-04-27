@@ -52,8 +52,16 @@ def _win_disable() -> None:
 # Linux — XDG autostart (works across all Raspberry Pi OS desktop sessions)
 # ---------------------------------------------------------------------------
 
-_XDG_AUTOSTART_DIR  = Path.home() / ".config" / "autostart"
-_XDG_AUTOSTART_FILE = _XDG_AUTOSTART_DIR / "autodash.desktop"
+_XDG_AUTOSTART_DIR   = Path.home() / ".config" / "autostart"
+_XDG_AUTOSTART_FILE  = _XDG_AUTOSTART_DIR / "autodash.desktop"
+_XDG_LXPANEL_FILE    = _XDG_AUTOSTART_DIR / "lxpanel.desktop"
+
+_LXPANEL_HIDDEN = (
+    "[Desktop Entry]\n"
+    "Type=Application\n"
+    "Name=LXPanel\n"
+    "Hidden=true\n"
+)
 
 
 def _desktop_entry(py: Path) -> str:
@@ -73,13 +81,15 @@ def _linux_check() -> bool:
 def _linux_enable() -> None:
     _XDG_AUTOSTART_DIR.mkdir(parents=True, exist_ok=True)
     _XDG_AUTOSTART_FILE.write_text(_desktop_entry(_venv_python()), encoding="utf-8")
+    _XDG_LXPANEL_FILE.write_text(_LXPANEL_HIDDEN, encoding="utf-8")
 
 
 def _linux_disable() -> None:
-    try:
-        _XDG_AUTOSTART_FILE.unlink(missing_ok=True)
-    except OSError:
-        pass
+    for f in (_XDG_AUTOSTART_FILE, _XDG_LXPANEL_FILE):
+        try:
+            f.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 # ---------------------------------------------------------------------------
