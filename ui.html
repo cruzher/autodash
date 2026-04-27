@@ -509,6 +509,16 @@
                 <span style="color:#9ca3af;font-size:12px;">Loading…</span>
               </template>
             </div>
+            <template x-if="autostartSupported">
+              <div>
+                <div class="section-title">Startup</div>
+                <div class="field checkbox-row">
+                  <input type="checkbox" id="start-at-login" x-model="startAtLogin" @change="setAutostart()">
+                  <label for="start-at-login">Start automatically at login</label>
+                </div>
+                <p class="hint" style="margin-top:6px;">When enabled, autodash will start automatically when you log in.</p>
+              </div>
+            </template>
             <div class="section-title">Display</div>
             <div class="field checkbox-row">
               <input type="checkbox" id="sleep-when-idle" x-model="settings.sleep_when_idle">
@@ -642,6 +652,8 @@ function app() {
     statusClass: "",
     settings: { sleep_when_idle: true, heartbeat_url: "", heartbeat_interval: 60, auto_update: true, remote_active_interval: 2, remote_idle_interval: 30 },
     sysinfo: null,
+    startAtLogin: false,
+    autostartSupported: false,
     updating: false,
     updateOutput: "",
     updateDone: false,
@@ -691,6 +703,10 @@ function app() {
       try {
         const res = await apiFetch("/sysinfo");
         if (res) this.sysinfo = await res.json();
+      } catch(e) { /* non-critical */ }
+      try {
+        const res = await apiFetch("/autostart");
+        if (res) { const d = await res.json(); this.startAtLogin = d.enabled; this.autostartSupported = d.supported; }
       } catch(e) { /* non-critical */ }
       if (this.page === 'home') {
         await this.fetchScreenshots();
@@ -1018,6 +1034,16 @@ function app() {
     async reboot() {
       if (!confirm("Reboot the system now?")) return;
       await apiFetch("/reboot", { method: "POST" });
+    },
+
+    async setAutostart() {
+      try {
+        await apiFetch("/autostart", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ enabled: this.startAtLogin }),
+        });
+      } catch(e) { /* non-critical */ }
     },
 
     async saveSettings() {

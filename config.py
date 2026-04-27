@@ -1,7 +1,5 @@
 """
-config.py - SiteConfig dataclass definition
-============================================
-Imported by both sites.py (for configuration) and monitor.py (for type hints).
+config.py - SiteConfig dataclass and JSON serialisation helpers.
 """
 
 import json
