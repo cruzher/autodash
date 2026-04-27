@@ -49,72 +49,64 @@ def _win_disable() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Linux — systemd user service (primary) + XDG autostart fallback
+# Linux — LXDE-pi lxsession autostart (Raspberry Pi OS)
 # ---------------------------------------------------------------------------
 
-_SERVICE_DIR  = Path.home() / ".config" / "systemd" / "user"
-_SERVICE_FILE = _SERVICE_DIR / "autodash.service"
-_DESKTOP      = Path.home() / ".config" / "autostart" / "autodash.desktop"
+_LXSESSION_DIR  = Path.home() / ".config" / "lxsession" / "LXDE-pi"
+_LXSESSION_FILE = _LXSESSION_DIR / "autostart"
+_LXSESSION_SYS  = Path("/etc/xdg/lxsession/LXDE-pi/autostart")
+_LXSESSION_MARK = "# autodash"
+
+
+def _lxsession_entry(py: Path) -> str:
+    return f"@lxterminal -e {py} {_SCRIPT}"
 
 
 def _linux_check() -> bool:
-    return _SERVICE_FILE.exists() or _DESKTOP.exists()
+    if not _LXSESSION_FILE.exists():
+        return False
+    try:
+        return _LXSESSION_MARK in _LXSESSION_FILE.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return False
 
 
 def _linux_enable() -> None:
     py = _venv_python()
+    _LXSESSION_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Try systemd user service first — reliable regardless of desktop environment.
-    try:
-        _SERVICE_DIR.mkdir(parents=True, exist_ok=True)
-        _SERVICE_FILE.write_text(
-            "[Unit]\n"
-            "Description=autodash dashboard monitor\n\n"
-            "[Service]\n"
-            "Type=simple\n"
-            f"ExecStart={py} {_SCRIPT}\n"
-            "Restart=on-failure\n"
-            "RestartSec=5\n"
-            "Environment=DISPLAY=:0\n\n"
-            "[Install]\n"
-            "WantedBy=default.target\n",
-            encoding="utf-8",
-        )
-        r1 = subprocess.run(
-            ["systemctl", "--user", "daemon-reload"], capture_output=True
-        )
-        r2 = subprocess.run(
-            ["systemctl", "--user", "enable", "autodash.service"], capture_output=True
-        )
-        if r1.returncode == 0 and r2.returncode == 0:
-            return
-    except Exception:
-        pass
+    if _LXSESSION_FILE.exists():
+        content = _LXSESSION_FILE.read_text(encoding="utf-8")
+        if _LXSESSION_MARK in content:
+            return  # already present
+    elif _LXSESSION_SYS.exists():
+        # Seed from system file so desktop items (panel, file manager) are preserved.
+        content = _LXSESSION_SYS.read_text(encoding="utf-8")
+    else:
+        content = ""
 
-    # Fallback: XDG autostart .desktop (lxsession-compatible).
-    _DESKTOP.parent.mkdir(parents=True, exist_ok=True)
-    _DESKTOP.write_text(
-        "[Desktop Entry]\n"
-        "Version=1.0\n"
-        "Type=Application\n"
-        "Name=autodash\n"
-        f"Exec={py} {_SCRIPT}\n"
-        "Hidden=false\n"
-        "NoDisplay=false\n"
-        "X-GNOME-Autostart-enabled=true\n",
-        encoding="utf-8",
-    )
+    entry = f"\n{_LXSESSION_MARK}\n{_lxsession_entry(py)}\n"
+    _LXSESSION_FILE.write_text(content.rstrip("\n") + entry, encoding="utf-8")
 
 
 def _linux_disable() -> None:
-    subprocess.run(
-        ["systemctl", "--user", "disable", "autodash.service"],
-        check=False, capture_output=True,
-    )
-    if _SERVICE_FILE.exists():
-        _SERVICE_FILE.unlink()
-    if _DESKTOP.exists():
-        _DESKTOP.unlink()
+    if not _LXSESSION_FILE.exists():
+        return
+    try:
+        lines  = _LXSESSION_FILE.read_text(encoding="utf-8").splitlines(keepends=True)
+        result = []
+        skip   = False
+        for line in lines:
+            if _LXSESSION_MARK in line:
+                skip = True
+                continue
+            if skip:
+                skip = False
+                continue
+            result.append(line)
+        _LXSESSION_FILE.write_text("".join(result), encoding="utf-8")
+    except OSError:
+        pass
 
 
 # ---------------------------------------------------------------------------
