@@ -58,6 +58,14 @@
       color: #8b949e;
       line-height: 1.6;
     }
+
+    .ip-label {
+      margin-top: 2rem;
+      font-size: 0.85rem;
+      color: #30363d;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.03em;
+    }
   </style>
 </head>
 <body>
@@ -66,8 +74,12 @@
     <div class="icon">&#x1F4C5;</div>
     <h1>No Dashboard Scheduled</h1>
     <p>The next scheduled dashboard will open automatically.</p>
+    <p class="ip-label" id="ip-label"></p>
   </div>
   <script>
+    const ip = location.hash.slice(1);
+    if (ip) document.getElementById("ip-label").textContent = ip;
+
     function tick() {
       const now = new Date();
       document.getElementById("clock").textContent =

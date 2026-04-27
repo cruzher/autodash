@@ -27,6 +27,18 @@ from display import (
 from scheduler import is_scheduled_now
 from site_monitor import SiteMonitor
 
+
+def _get_local_ip() -> str:
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return ""
+
 _SITES_JSON_PATH = Path(__file__).parent / "sites.json"
 _LOG_DIR         = Path(__file__).parent / "logs"
 _LOG_DIR.mkdir(exist_ok=True)
@@ -95,11 +107,13 @@ class _NoticeWindow:
             enable_display_sleep()
         launch_env = {"DISPLAY": os.environ.get("DISPLAY", ":0")} if IS_LINUX else {}
         try:
-            self._context = await self._pw.chromium.launch_persistent_context(
+            ip  = _get_local_ip()
+        url = self._URL + ("#" + ip if ip else "")
+        self._context = await self._pw.chromium.launch_persistent_context(
                 user_data_dir       = str(Path(tempfile.mkdtemp(prefix="pw_notice_"))),
                 headless            = False,
                 args                = [
-                    f"--app={self._URL}",
+                    f"--app={url}",
                     "--start-fullscreen",
                     "--disable-infobars",
                     "--test-type",
