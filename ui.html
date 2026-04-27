@@ -812,6 +812,7 @@ function app() {
 
     handleKeyCapture(event) {
       if (this.showTextPopup) return;
+      if (event.repeat) return;
       const key = event.key;
       if (['Control', 'Alt', 'Shift', 'Meta', 'CapsLock', 'NumLock', 'ScrollLock'].includes(key)) return;
 

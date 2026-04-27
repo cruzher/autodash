@@ -3,6 +3,7 @@ monitor.py - Multi-Site Auto-Login Monitor using Playwright (Chromium)
 """
 
 import asyncio
+import threading
 import pyotp
 import datetime
 import json
@@ -145,6 +146,7 @@ def _load_settings() -> dict:
 _sleep_when_idle    = True
 _heartbeat_url      = ""
 _heartbeat_interval = 60
+_pyautogui_lock     = threading.Lock()  # serialize all input simulation calls
 
 
 def _apply_settings(s: dict) -> None:
@@ -329,7 +331,7 @@ async def api_click(req: ClickRequest, _: None = Depends(require_auth)):
     import pyautogui
 
     def _click():
-        with mss.mss() as sct:
+        with _pyautogui_lock, mss.mss() as sct:
             idx = max(1, min(req.monitor, len(sct.monitors) - 1))
             mon = sct.monitors[idx]
             virtual = sct.monitors[0]
@@ -357,13 +359,14 @@ async def api_type(req: TypeRequest, _: None = Depends(require_auth)):
     import pyautogui
 
     def _type():
-        if req.method == "type":
-            pyautogui.write(req.text, interval=0.02)
-        else:
-            pyperclip.copy(req.text)
-            pyautogui.hotkey("ctrl", "v")
-        if req.send_enter:
-            pyautogui.press("enter")
+        with _pyautogui_lock:
+            if req.method == "type":
+                pyautogui.write(req.text, interval=0.02)
+            else:
+                pyperclip.copy(req.text)
+                pyautogui.hotkey("ctrl", "v")
+            if req.send_enter:
+                pyautogui.press("enter")
 
     try:
         loop = asyncio.get_running_loop()
@@ -379,10 +382,11 @@ async def api_key(req: KeyRequest, _: None = Depends(require_auth)):
     import pyautogui
 
     def _press():
-        if isinstance(req.key, list):
-            pyautogui.hotkey(*req.key)
-        else:
-            pyautogui.press(req.key)
+        with _pyautogui_lock:
+            if isinstance(req.key, list):
+                pyautogui.hotkey(*req.key)
+            else:
+                pyautogui.press(req.key)
 
     try:
         loop = asyncio.get_running_loop()
