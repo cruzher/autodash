@@ -17,12 +17,10 @@ from api import WEB_PORT, api
 from config import load_sites_json
 from display import (
     IS_LINUX,
-    IS_WAYLAND,
     check_tools,
     disable_display_sleep,
     display_keepalive,
     enable_display_sleep,
-    get_chromium_env,
     wake_display,
 )
 from scheduler import is_scheduled_now
@@ -94,24 +92,21 @@ class _NoticeWindow:
         self._log.info("No monitors active — showing 'No dashboard scheduled' notice.")
         if settings.sleep_when_idle:
             enable_display_sleep()
-        launch_env = get_chromium_env()
-        args = [
-            f"--app={self._URL}",
-            "--start-fullscreen",
-            "--disable-infobars",
-            "--test-type",
-            "--no-default-browser-check",
-            "--no-first-run",
-            "--disable-extensions",
-            "--password-store=basic",
-        ]
-        if IS_WAYLAND:
-            args.append("--ozone-platform=wayland")
+        launch_env = {"DISPLAY": os.environ.get("DISPLAY", ":0")} if IS_LINUX else {}
         try:
             self._context = await self._pw.chromium.launch_persistent_context(
                 user_data_dir       = str(Path(tempfile.mkdtemp(prefix="pw_notice_"))),
                 headless            = False,
-                args                = args,
+                args                = [
+                    f"--app={self._URL}",
+                    "--start-fullscreen",
+                    "--disable-infobars",
+                    "--test-type",
+                    "--no-default-browser-check",
+                    "--no-first-run",
+                    "--disable-extensions",
+                    "--password-store=basic",
+                ],
                 ignore_default_args = ["--enable-automation"],
                 no_viewport         = True,
                 ignore_https_errors = True,

@@ -6,25 +6,15 @@ import shutil
 import subprocess
 
 IS_LINUX    = platform.system() == "Linux"
-IS_WAYLAND  = IS_LINUX and (
-    bool(os.environ.get("WAYLAND_DISPLAY")) or
-    os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland"
-)
-HAS_XDOTOOL = IS_LINUX and not IS_WAYLAND and shutil.which("xdotool") is not None
-HAS_WMCTRL  = IS_LINUX and not IS_WAYLAND and shutil.which("wmctrl") is not None
+HAS_XDOTOOL = IS_LINUX and shutil.which("xdotool") is not None
+HAS_WMCTRL  = IS_LINUX and shutil.which("wmctrl") is not None
 
 _display_sleep_disabled = False
-_inhibit_proc = None  # systemd-inhibit process used on Wayland
 
 
 def check_tools():
     """Log warnings for missing Linux window-management tools."""
-    if not IS_LINUX:
-        return
-    if IS_WAYLAND:
-        if not shutil.which("systemd-inhibit"):
-            logging.warning("systemd-inhibit not found — display may sleep on Wayland.")
-    else:
+    if IS_LINUX:
         if not HAS_XDOTOOL:
             logging.warning("xdotool not found. Install: sudo apt install xdotool")
         if not HAS_WMCTRL:
@@ -33,27 +23,9 @@ def check_tools():
 
 def get_env():
     env = os.environ.copy()
-    if IS_WAYLAND:
-        if "WAYLAND_DISPLAY" not in env:
-            env["WAYLAND_DISPLAY"] = "wayland-1"
-        if "XDG_RUNTIME_DIR" not in env:
-            env["XDG_RUNTIME_DIR"] = f"/run/user/{os.getuid()}"
-    else:
-        if "DISPLAY" not in env:
-            env["DISPLAY"] = ":0"
+    if "DISPLAY" not in env:
+        env["DISPLAY"] = ":0"
     return env
-
-
-def get_chromium_env() -> dict:
-    """Return display-related env overrides for Playwright's Chromium launch."""
-    if not IS_LINUX:
-        return {}
-    if IS_WAYLAND:
-        env = {"WAYLAND_DISPLAY": os.environ.get("WAYLAND_DISPLAY", "wayland-1")}
-        xdg = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
-        env["XDG_RUNTIME_DIR"] = xdg
-        return env
-    return {"DISPLAY": os.environ.get("DISPLAY", ":0")}
 
 
 def run_cmd(cmd, timeout=5):
@@ -67,35 +39,21 @@ def run_cmd(cmd, timeout=5):
 
 
 def disable_display_sleep():
-    global _display_sleep_disabled, _inhibit_proc
+    global _display_sleep_disabled
     if _display_sleep_disabled:
         return
     _display_sleep_disabled = True
-    if IS_LINUX:
-        if IS_WAYLAND:
-            if shutil.which("systemd-inhibit"):
-                try:
-                    _inhibit_proc = subprocess.Popen(
-                        ["systemd-inhibit", "--what=idle:sleep", "--who=autodash",
-                         "--why=Dashboard display", "--mode=block", "sleep", "infinity"],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                    )
-                    logging.info("Display sleep inhibited via systemd-inhibit.")
-                except Exception as exc:
-                    logging.warning("systemd-inhibit failed: %s", exc)
-            else:
-                logging.warning("systemd-inhibit not found — display may sleep on Wayland.")
-        elif shutil.which("xset"):
-            for args in (
-                ["xset", "s", "off"],
-                ["xset", "s", "0", "0"],
-                ["xset", "-dpms"],
-                ["xset", "s", "noblank"],
-            ):
-                r = run_cmd(args)
-                if r.returncode != 0:
-                    logging.warning("xset command failed: %s", " ".join(args))
-            logging.info("Display sleep disabled via xset.")
+    if IS_LINUX and shutil.which("xset"):
+        for args in (
+            ["xset", "s", "off"],
+            ["xset", "s", "0", "0"],
+            ["xset", "-dpms"],
+            ["xset", "s", "noblank"],
+        ):
+            r = run_cmd(args)
+            if r.returncode != 0:
+                logging.warning("xset command failed: %s", " ".join(args))
+        logging.info("Display sleep disabled via xset.")
     elif platform.system() == "Windows":
         import ctypes
         ES_CONTINUOUS       = 0x80000000
@@ -108,7 +66,7 @@ def disable_display_sleep():
 
 def wake_display():
     """Force the display on after it may have gone to sleep."""
-    if IS_LINUX and not IS_WAYLAND and shutil.which("xset"):
+    if IS_LINUX and shutil.which("xset"):
         r = run_cmd(["xset", "dpms", "force", "on"])
         if r.returncode != 0:
             logging.warning("xset dpms force on failed.")
@@ -118,26 +76,20 @@ def wake_display():
 
 
 def enable_display_sleep():
-    global _display_sleep_disabled, _inhibit_proc
+    global _display_sleep_disabled
     if not _display_sleep_disabled:
         return
     _display_sleep_disabled = False
-    if IS_LINUX:
-        if IS_WAYLAND:
-            if _inhibit_proc and _inhibit_proc.poll() is None:
-                _inhibit_proc.terminate()
-                _inhibit_proc = None
-                logging.info("Display sleep re-enabled (systemd-inhibit stopped).")
-        elif shutil.which("xset"):
-            for args in (
-                ["xset", "s", "on"],
-                ["xset", "+dpms"],
-                ["xset", "s", "blank"],
-            ):
-                r = run_cmd(args)
-                if r.returncode != 0:
-                    logging.warning("xset command failed: %s", " ".join(args))
-            logging.info("Display sleep re-enabled via xset.")
+    if IS_LINUX and shutil.which("xset"):
+        for args in (
+            ["xset", "s", "on"],
+            ["xset", "+dpms"],
+            ["xset", "s", "blank"],
+        ):
+            r = run_cmd(args)
+            if r.returncode != 0:
+                logging.warning("xset command failed: %s", " ".join(args))
+        logging.info("Display sleep re-enabled via xset.")
     elif platform.system() == "Windows":
         import ctypes
         ES_CONTINUOUS = 0x80000000
@@ -229,7 +181,7 @@ async def fit_viewport_to_window(page):
 async def position_window(cfg, page):
     if cfg.fullscreen:
         return
-    if IS_LINUX and not IS_WAYLAND:
+    if IS_LINUX:
         await asyncio.sleep(1.5)
         try:
             title = await page.title()
@@ -265,8 +217,8 @@ async def position_window(cfg, page):
 
 async def display_keepalive():
     """Periodically reset the X11 screensaver timer to prevent blanking on Linux.
-    Runs only when display sleep is currently disabled. No-op on Wayland."""
-    if not IS_LINUX or IS_WAYLAND or not shutil.which("xset"):
+    Runs only when display sleep is currently disabled."""
+    if not IS_LINUX or not shutil.which("xset"):
         return
     while True:
         await asyncio.sleep(50)
