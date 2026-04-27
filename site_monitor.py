@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import os
 import re
 from pathlib import Path
 from urllib.parse import quote as _url_quote
@@ -15,9 +14,11 @@ from playwright.async_api import (
 from connectivity import check_internet, check_site_available
 from display import (
     IS_LINUX,
+    IS_WAYLAND,
     find_window_id,
     fit_viewport_to_window,
     force_window_geometry,
+    get_chromium_env,
     get_window_geometry,
     position_window,
 )
@@ -54,6 +55,8 @@ def build_args(cfg):
         "--disable-background-networking",
         "--password-store=basic",
     ]
+    if IS_WAYLAND:
+        args.append("--ozone-platform=wayland")
     args.append(f"--window-position={cfg.window_x},{cfg.window_y}")
     if cfg.fullscreen:
         args.append("--start-fullscreen")
@@ -109,7 +112,7 @@ class SiteMonitor:
         )
         self.log.info("Launching Chromium app-mode window [%s] ...", mode)
 
-        launch_env = {"DISPLAY": os.environ.get("DISPLAY", ":0")} if IS_LINUX else {}
+        launch_env = get_chromium_env()
 
         self.context = await self.pw.chromium.launch_persistent_context(
             user_data_dir       = str(self.profile_dir),
@@ -129,7 +132,7 @@ class SiteMonitor:
 
         await position_window(self.cfg, self.page)
 
-        if IS_LINUX and not self.cfg.fullscreen:
+        if IS_LINUX and not IS_WAYLAND and not self.cfg.fullscreen:
             try:
                 title = await self.page.title()
             except Exception:
@@ -160,7 +163,7 @@ class SiteMonitor:
         await self.navigate_and_login()
 
     async def _check_window_position(self):
-        if not IS_LINUX or self.cfg.fullscreen:
+        if not IS_LINUX or IS_WAYLAND or self.cfg.fullscreen:
             return
         if not self._window_id:
             try:

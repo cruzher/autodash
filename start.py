@@ -59,7 +59,19 @@ def check_vcredist() -> None:
         print("      Install manually: https://aka.ms/vs/17/release/vc_redist.x64.exe")
 
 
+def _is_wayland() -> bool:
+    import os
+    return (
+        bool(os.environ.get("WAYLAND_DISPLAY")) or
+        os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland"
+    )
+
+
 def ensure_xdotool() -> None:
+    if _is_wayland():
+        if not shutil.which("systemd-inhibit"):
+            print("[WARN] Running on Wayland — systemd-inhibit not found (display may sleep).")
+        return
     if shutil.which("xdotool"):
         return
     if shutil.which("apt-get"):
