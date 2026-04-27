@@ -49,62 +49,35 @@ def _win_disable() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Linux — LXDE-pi lxsession autostart (Raspberry Pi OS)
+# Linux — XDG autostart (works across all Raspberry Pi OS desktop sessions)
 # ---------------------------------------------------------------------------
 
-_LXSESSION_DIR  = Path.home() / ".config" / "lxsession" / "LXDE-pi"
-_LXSESSION_FILE = _LXSESSION_DIR / "autostart"
-_LXSESSION_SYS  = Path("/etc/xdg/lxsession/LXDE-pi/autostart")
-_LXSESSION_MARK = "# autodash"
+_XDG_AUTOSTART_DIR  = Path.home() / ".config" / "autostart"
+_XDG_AUTOSTART_FILE = _XDG_AUTOSTART_DIR / "autodash.desktop"
 
 
-def _lxsession_entry(py: Path) -> str:
-    return f"@lxterminal -e {py} {_SCRIPT}"
+def _desktop_entry(py: Path) -> str:
+    return (
+        "[Desktop Entry]\n"
+        "Type=Application\n"
+        "Name=autodash\n"
+        f'Exec="{py}" "{_SCRIPT}"\n'
+        "X-GNOME-Autostart-enabled=true\n"
+    )
 
 
 def _linux_check() -> bool:
-    if not _LXSESSION_FILE.exists():
-        return False
-    try:
-        return _LXSESSION_MARK in _LXSESSION_FILE.read_text(encoding="utf-8", errors="ignore")
-    except OSError:
-        return False
+    return _XDG_AUTOSTART_FILE.exists()
 
 
 def _linux_enable() -> None:
-    py = _venv_python()
-    _LXSESSION_DIR.mkdir(parents=True, exist_ok=True)
-
-    if _LXSESSION_FILE.exists():
-        content = _LXSESSION_FILE.read_text(encoding="utf-8")
-        if _LXSESSION_MARK in content:
-            return  # already present
-    elif _LXSESSION_SYS.exists():
-        # Seed from system file so desktop items (panel, file manager) are preserved.
-        content = _LXSESSION_SYS.read_text(encoding="utf-8")
-    else:
-        content = ""
-
-    entry = f"\n{_LXSESSION_MARK}\n{_lxsession_entry(py)}\n"
-    _LXSESSION_FILE.write_text(content.rstrip("\n") + entry, encoding="utf-8")
+    _XDG_AUTOSTART_DIR.mkdir(parents=True, exist_ok=True)
+    _XDG_AUTOSTART_FILE.write_text(_desktop_entry(_venv_python()), encoding="utf-8")
 
 
 def _linux_disable() -> None:
-    if not _LXSESSION_FILE.exists():
-        return
     try:
-        lines  = _LXSESSION_FILE.read_text(encoding="utf-8").splitlines(keepends=True)
-        result = []
-        skip   = False
-        for line in lines:
-            if _LXSESSION_MARK in line:
-                skip = True
-                continue
-            if skip:
-                skip = False
-                continue
-            result.append(line)
-        _LXSESSION_FILE.write_text("".join(result), encoding="utf-8")
+        _XDG_AUTOSTART_FILE.unlink(missing_ok=True)
     except OSError:
         pass
 
