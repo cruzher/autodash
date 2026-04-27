@@ -49,47 +49,85 @@ def _win_disable() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Linux — XDG autostart (works across all Raspberry Pi OS desktop sessions)
+# Linux — lxsession autostart (Raspberry Pi OS)
+# Manages ~/.config/lxsession/LXDE-pi/autostart:
+#   - seeds from the system file so other desktop items are preserved
+#   - strips @lxpanel so the taskbar does not appear
+#   - adds the autodash start entry
 # ---------------------------------------------------------------------------
 
-_XDG_AUTOSTART_DIR   = Path.home() / ".config" / "autostart"
-_XDG_AUTOSTART_FILE  = _XDG_AUTOSTART_DIR / "autodash.desktop"
-_XDG_LXPANEL_FILE    = _XDG_AUTOSTART_DIR / "lxpanel.desktop"
+_LXSESSION_DIR  = Path.home() / ".config" / "lxsession" / "LXDE-pi"
+_LXSESSION_FILE = _LXSESSION_DIR / "autostart"
+_LXSESSION_SYS  = Path("/etc/xdg/lxsession/LXDE-pi/autostart")
+_LXSESSION_MARK = "# autodash"
 
-_LXPANEL_HIDDEN = (
-    "[Desktop Entry]\n"
-    "Type=Application\n"
-    "Name=LXPanel\n"
-    "Hidden=true\n"
-)
+# XDG files written by a previous version of this code — removed on enable/disable
+_XDG_AUTOSTART_DIR  = Path.home() / ".config" / "autostart"
+_XDG_LEGACY_FILES   = [
+    _XDG_AUTOSTART_DIR / "autodash.desktop",
+    _XDG_AUTOSTART_DIR / "lxpanel.desktop",
+]
 
 
-def _desktop_entry(py: Path) -> str:
-    return (
-        "[Desktop Entry]\n"
-        "Type=Application\n"
-        "Name=autodash\n"
-        f'Exec="{py}" "{_SCRIPT}"\n'
-        "X-GNOME-Autostart-enabled=true\n"
-    )
+def _lxsession_entry() -> str:
+    return f"@lxterminal -e {_venv_python()} {_SCRIPT}"
 
 
 def _linux_check() -> bool:
-    return _XDG_AUTOSTART_FILE.exists()
+    if not _LXSESSION_FILE.exists():
+        return False
+    try:
+        return _LXSESSION_MARK in _LXSESSION_FILE.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return False
 
 
 def _linux_enable() -> None:
-    _XDG_AUTOSTART_DIR.mkdir(parents=True, exist_ok=True)
-    _XDG_AUTOSTART_FILE.write_text(_desktop_entry(_venv_python()), encoding="utf-8")
-    _XDG_LXPANEL_FILE.write_text(_LXPANEL_HIDDEN, encoding="utf-8")
+    for f in _XDG_LEGACY_FILES:
+        f.unlink(missing_ok=True)
+
+    if _LXSESSION_FILE.exists():
+        content = _LXSESSION_FILE.read_text(encoding="utf-8")
+        if _LXSESSION_MARK in content:
+            return
+    elif _LXSESSION_SYS.exists():
+        content = _LXSESSION_SYS.read_text(encoding="utf-8")
+    else:
+        content = ""
+
+    # Strip lxpanel so the taskbar does not appear
+    lines = [l for l in content.splitlines() if not l.strip().startswith("@lxpanel")]
+    lines.append(f"\n{_LXSESSION_MARK}")
+    lines.append(_lxsession_entry())
+    _LXSESSION_DIR.mkdir(parents=True, exist_ok=True)
+    _LXSESSION_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def _linux_disable() -> None:
-    for f in (_XDG_AUTOSTART_FILE, _XDG_LXPANEL_FILE):
-        try:
-            f.unlink(missing_ok=True)
-        except OSError:
-            pass
+    for f in _XDG_LEGACY_FILES:
+        f.unlink(missing_ok=True)
+
+    if not _LXSESSION_FILE.exists():
+        return
+    try:
+        lines  = _LXSESSION_FILE.read_text(encoding="utf-8").splitlines()
+        result = []
+        skip   = False
+        for line in lines:
+            if _LXSESSION_MARK in line:
+                skip = True
+                continue
+            if skip:
+                skip = False
+                continue
+            result.append(line)
+        remaining = "\n".join(result).strip()
+        if remaining:
+            _LXSESSION_FILE.write_text(remaining + "\n", encoding="utf-8")
+        else:
+            _LXSESSION_FILE.unlink()
+    except OSError:
+        pass
 
 
 # ---------------------------------------------------------------------------
