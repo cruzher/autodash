@@ -92,8 +92,8 @@ def fix_wayland() -> None:
     sys.exit(0)
 
 
-def ensure_pi_defaults() -> None:
-    """On Raspberry Pi: enable autostart and fix Wayland (in that order)."""
+def ensure_pi_autostart() -> None:
+    """On Raspberry Pi: enable autostart at login."""
     if not is_raspberry_pi():
         return
 
@@ -105,6 +105,12 @@ def ensure_pi_defaults() -> None:
             print("[OK] autodash will start automatically after login.")
         except Exception as exc:
             print(f"[WARN] Could not enable autostart: {exc}")
+
+
+def ensure_pi_display() -> None:
+    """On Raspberry Pi: switch to X11 if Wayland is active. Call after all deps are installed."""
+    if not is_raspberry_pi():
+        return
 
     if is_wayland():
         banner(
@@ -191,11 +197,13 @@ def main() -> None:
     if IS_WINDOWS:
         check_vcredist()
     else:
-        ensure_pi_defaults()
+        ensure_pi_autostart()
         ensure_xdotool()
     venv_created  = ensure_venv()
     deps_updated  = install_deps(venv_created)
     install_playwright(deps_updated)
+    if not IS_WINDOWS:
+        ensure_pi_display()
     launch_monitor()
 
 
