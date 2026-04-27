@@ -13,6 +13,7 @@ import uvicorn
 from playwright.async_api import async_playwright
 
 import settings
+import api as _api_mod
 from api import WEB_PORT, api
 from config import load_sites_json
 from display import (
@@ -31,7 +32,7 @@ _LOG_DIR         = Path(__file__).parent / "logs"
 _LOG_DIR.mkdir(exist_ok=True)
 _LOG_PATH        = _LOG_DIR / "autodash.log"
 
-SCHEDULE_CHECK_SECONDS = 60
+SCHEDULE_CHECK_SECONDS = 5
 
 _LOG_FORMAT  = "%(asctime)s  [%(levelname)s]  %(name)s  - %(message)s"
 _LOG_DATEFMT = "%Y-%m-%d %H:%M:%S"
@@ -152,9 +153,10 @@ async def schedule_coordinator(monitors, pw):
 
     while True:
         any_active = False
+        paused = _api_mod._scheduler_paused
 
         for m in monitors:
-            active = is_scheduled_now(m.cfg.schedule)
+            active = False if paused else is_scheduled_now(m.cfg.schedule)
             if active:
                 any_active = True
 
@@ -188,7 +190,7 @@ async def schedule_coordinator(monitors, pw):
 
             was_active[m] = active
 
-        if any_active:
+        if paused or any_active:
             await notice.close()
         else:
             await notice.open()

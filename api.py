@@ -32,6 +32,7 @@ _LOG_PATH        = Path(__file__).parent / "logs" / "autodash.log"
 WEB_PORT = int(os.environ.get("WEB_PORT", 8080))
 
 _pyautogui_lock = threading.Lock()
+_scheduler_paused: bool = False
 
 
 class ClickRequest(BaseModel):
@@ -52,6 +53,19 @@ class KeyRequest(BaseModel):
 
 
 api = FastAPI(title="autodash config")
+
+
+@api.get("/scheduler/pause")
+def api_get_scheduler_pause(_: None = Depends(require_auth)):
+    return JSONResponse(content={"paused": _scheduler_paused})
+
+
+@api.post("/scheduler/pause")
+async def api_set_scheduler_pause(request: Request, _: None = Depends(require_auth)):
+    global _scheduler_paused
+    body = await request.json()
+    _scheduler_paused = bool(body.get("paused", False))
+    return {"ok": True}
 
 
 @api.get("/sites")
