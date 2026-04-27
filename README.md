@@ -184,19 +184,19 @@ sudo apt install xdotool wmctrl
 
 ## Running on boot (Raspberry Pi)
 
-To start autodash automatically when the desktop loads, add an entry to the LXDE autostart file:
+To start autodash automatically when the desktop loads, add an entry to the lxsession autostart file:
 
 ```
-/home/<username>/.config/lxsession/LXDE-pi/autostart
+/home/<username>/.config/lxsession/rpd-x/autostart
 ```
 
 Add this line at the end of the file (create the file if it does not exist):
 
 ```
-@lxterminal -e /usr/bin/bash /home/<username>/autodash/start.sh
+@lxterminal -e python3 /home/<username>/autodash/start.py
 ```
 
-Replace the path with the actual location of `start.sh` on your system.
+Replace the path with the actual location of `start.py` on your system.
 
 ---
 

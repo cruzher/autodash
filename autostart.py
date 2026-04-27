@@ -56,9 +56,9 @@ def _win_disable() -> None:
 #   - adds the autodash start entry
 # ---------------------------------------------------------------------------
 
-_LXSESSION_DIR  = Path.home() / ".config" / "lxsession" / "LXDE-pi"
+_LXSESSION_DIR  = Path.home() / ".config" / "lxsession" / "rpd-x"
 _LXSESSION_FILE = _LXSESSION_DIR / "autostart"
-_LXSESSION_SYS  = Path("/etc/xdg/lxsession/LXDE-pi/autostart")
+_LXSESSION_SYS  = Path("/etc/xdg/lxsession/rpd-x/autostart")
 _LXSESSION_MARK = "# autodash"
 
 # XDG files written by a previous version of this code — removed on enable/disable
