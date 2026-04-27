@@ -49,21 +49,53 @@ def _win_disable() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Linux — XDG autostart .desktop (lxsession-compatible)
+# Linux — systemd user service (primary) + XDG autostart fallback
 # ---------------------------------------------------------------------------
 
-_DESKTOP = Path.home() / ".config" / "autostart" / "autodash.desktop"
+_SERVICE_DIR  = Path.home() / ".config" / "systemd" / "user"
+_SERVICE_FILE = _SERVICE_DIR / "autodash.service"
+_DESKTOP      = Path.home() / ".config" / "autostart" / "autodash.desktop"
 
 
 def _linux_check() -> bool:
-    return _DESKTOP.exists()
+    return _SERVICE_FILE.exists() or _DESKTOP.exists()
 
 
 def _linux_enable() -> None:
-    _DESKTOP.parent.mkdir(parents=True, exist_ok=True)
     py = _venv_python()
+
+    # Try systemd user service first — reliable regardless of desktop environment.
+    try:
+        _SERVICE_DIR.mkdir(parents=True, exist_ok=True)
+        _SERVICE_FILE.write_text(
+            "[Unit]\n"
+            "Description=autodash dashboard monitor\n\n"
+            "[Service]\n"
+            "Type=simple\n"
+            f"ExecStart={py} {_SCRIPT}\n"
+            "Restart=on-failure\n"
+            "RestartSec=5\n"
+            "Environment=DISPLAY=:0\n\n"
+            "[Install]\n"
+            "WantedBy=default.target\n",
+            encoding="utf-8",
+        )
+        r1 = subprocess.run(
+            ["systemctl", "--user", "daemon-reload"], capture_output=True
+        )
+        r2 = subprocess.run(
+            ["systemctl", "--user", "enable", "autodash.service"], capture_output=True
+        )
+        if r1.returncode == 0 and r2.returncode == 0:
+            return
+    except Exception:
+        pass
+
+    # Fallback: XDG autostart .desktop (lxsession-compatible).
+    _DESKTOP.parent.mkdir(parents=True, exist_ok=True)
     _DESKTOP.write_text(
         "[Desktop Entry]\n"
+        "Version=1.0\n"
         "Type=Application\n"
         "Name=autodash\n"
         f"Exec={py} {_SCRIPT}\n"
@@ -75,6 +107,12 @@ def _linux_enable() -> None:
 
 
 def _linux_disable() -> None:
+    subprocess.run(
+        ["systemctl", "--user", "disable", "autodash.service"],
+        check=False, capture_output=True,
+    )
+    if _SERVICE_FILE.exists():
+        _SERVICE_FILE.unlink()
     if _DESKTOP.exists():
         _DESKTOP.unlink()
 
