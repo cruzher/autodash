@@ -222,15 +222,21 @@
             <div style="display:flex;align-items:center;gap:8px;">
               <span x-show="screenshotUpdated" x-text="screenshotUpdated"
                     style="font-size:12px;color:#9ca3af;"></span>
+              <button class="btn-secondary"
+                      :title="displayFitMode ? 'Switch to actual resolution' : 'Switch to fit window'"
+                      @click="displayFitMode = !displayFitMode"
+                      x-text="displayFitMode ? 'Fit' : 'Actual'"></button>
               <button class="btn-secondary" @click="fetchScreenshots()">Refresh</button>
               <span class="status" :class="screenshotError ? 'err' : 'ok'"
                     x-text="screenshotError || 'live'"></span>
             </div>
           </div>
-          <div style="background:#111827;border-radius:0 0 8px 8px;overflow:hidden;line-height:0;">
+          <div :style="displayFitMode
+            ? 'background:#111827;border-radius:0 0 8px 8px;overflow:hidden;line-height:0;max-height:calc(100vh - 160px);display:flex;align-items:center;justify-content:center;'
+            : 'background:#111827;border-radius:0 0 8px 8px;overflow:auto;line-height:0;'">
             <template x-if="screenshotSrc">
               <img :src="screenshotSrc"
-                   style="max-width:100%;height:auto;display:block;cursor:crosshair;"
+                   :style="displayFitMode ? 'max-width:100%;max-height:100%;width:auto;height:auto;display:block;cursor:crosshair;' : 'display:block;cursor:crosshair;'"
                    alt="Display screenshot"
                    @click="sendClick($event)"
                    @contextmenu="sendRightClick($event)"
@@ -671,6 +677,7 @@ function app() {
     logAutoScroll: true,
     logAutoRefresh: false,
     _logTimer: null,
+    displayFitMode: true,
     screenshotSrc: null,
     screenshotError: null,
     screenshotUpdated: "",
