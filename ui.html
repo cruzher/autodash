@@ -232,11 +232,11 @@
             </div>
           </div>
           <div :style="displayFitMode
-            ? 'background:#111827;border-radius:0 0 8px 8px;overflow:hidden;line-height:0;max-height:calc(100vh - 160px);display:flex;align-items:center;justify-content:center;'
+            ? 'background:#111827;border-radius:0 0 8px 8px;overflow:hidden;line-height:0;'
             : 'background:#111827;border-radius:0 0 8px 8px;overflow:auto;line-height:0;'">
             <template x-if="screenshotSrc">
               <img :src="screenshotSrc"
-                   :style="displayFitMode ? 'max-width:100%;max-height:100%;width:auto;height:auto;display:block;cursor:crosshair;' : 'display:block;cursor:crosshair;'"
+                   :style="displayFitMode ? 'max-width:100%;max-height:calc(100vh - 160px);width:auto;height:auto;display:block;cursor:crosshair;' : 'display:block;cursor:crosshair;'"
                    alt="Display screenshot"
                    @click="sendClick($event)"
                    @contextmenu="sendRightClick($event)"
