@@ -200,4 +200,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    if IS_WINDOWS and sys.stdout is None:
+        _log = open(DIR / "autostart.log", "a", encoding="utf-8")
+        sys.stdout = _log
+        sys.stderr = _log
     main()
