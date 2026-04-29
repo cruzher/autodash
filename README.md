@@ -6,62 +6,31 @@ A lightweight dashboard monitor that opens one or more web dashboards in dedicat
 
 ## Requirements
 
-- Git
-- Python 3.9+
-- Linux: `python3-venv`, `xdotool`, `wmctrl`
-- Windows: Python from [python.org](https://www.python.org/) with "Add to PATH" checked
+- [Git](https://git-scm.com/)
+- [Python 3.9+](https://www.python.org/) — on Windows, install from python.org with **"Add Python to PATH"** checked
 
-All other dependencies are installed automatically by the setup script.
+Everything else (virtualenv, Playwright, Chromium, system packages) is handled automatically by `start.py`.
 
 ---
 
 ## Installation
 
-### 1. Install Git
-
-**Linux (debian)**
-```bash
-sudo apt install git
-```
-
-**Windows**
-```powershell
-winget install --id Git.Git -e --source winget
-```
-
-**Windows — Visual C++ Redistributable** (required by Playwright)
-```powershell
-winget install --id Microsoft.VCRedist.2015+.x64 -e
-```
-
-### 2. Clone the repository
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/cruzher/autodash.git
 cd autodash
 ```
 
-### 3. Install dependencies and start
+### 2. Run the setup and start
 
-**Linux** — installs dependencies and starts the monitor:
 ```bash
-bash start.sh
+python start.py
 ```
 
-**Windows** — installs dependencies:
-```powershell
-.\install.ps1
-```
+> On Linux you may need `python3 start.py`.
 
-> If PowerShell blocks the script with an execution policy error, run once:
-> `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
-
-Then start the monitor:
-```powershell
-.venv\Scripts\python monitor.py
-```
-
-On Linux, re-running `start.sh` is safe — dependency installation is skipped automatically if nothing has changed.
+`start.py` creates a virtual environment, installs all dependencies, and launches the monitor. Re-running it is safe — steps that are already complete are skipped.
 
 ---
 
