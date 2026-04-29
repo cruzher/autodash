@@ -11,7 +11,7 @@ _SYSTEM = platform.system()
 
 def _venv_python() -> Path:
     if _SYSTEM == "Windows":
-        return _DIR / ".venv" / "Scripts" / "pythonw.exe"
+        return _DIR / ".venv" / "Scripts" / "python.exe"
     return _DIR / ".venv" / "bin" / "python"
 
 
