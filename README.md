@@ -6,8 +6,19 @@ A lightweight dashboard monitor that opens one or more web dashboards in dedicat
 
 ## Requirements
 
-- [Git](https://git-scm.com/)
-- [Python 3.9+](https://www.python.org/) — on Windows, install from python.org with **"Add Python to PATH"** checked
+- Git
+- Python 3.9+
+
+**Windows** — install both with winget:
+```powershell
+winget install Git.Git
+winget install Python.Python.3.14
+```
+
+**Linux (Debian/Ubuntu)**:
+```bash
+sudo apt install git python3
+```
 
 Everything else (virtualenv, Playwright, Chromium, system packages) is handled automatically by `start.py`.
 
