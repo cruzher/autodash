@@ -45,22 +45,17 @@ python start.py
 
 ---
 
-## Configuration
+## First login
 
-Open the web UI in a browser:
+Once the monitor is running, open a browser and navigate to:
 
 ```
 http://<machine-ip>:8080/ui
 ```
 
-On the first visit you will be prompted to create a username and password. Subsequent visits require those credentials to log in (sessions expire after 8 hours).
+The machine's IP address is shown on screen — if no dashboard is currently scheduled, a fullscreen notice displays it. On the first visit you will be prompted to create a username and password. Subsequent visits require those credentials to log in (sessions expire after 8 hours).
 
 Add one entry per dashboard. Each entry opens one Chromium window. Changes are picked up automatically within 60 seconds — no restart needed.
-
-> The port defaults to `8080`. Override with the `WEB_PORT` environment variable:
-> ```
-> WEB_PORT=9090 python monitor.py
-> ```
 
 ---
 
@@ -140,7 +135,23 @@ click   #login-modal button.submit
 
 Each site can optionally be given one or more active time windows. When a site is outside its schedule its window is closed automatically. When no site is scheduled, a fullscreen **"No Dashboard Scheduled"** notice is shown. The windows reopen automatically when a schedule window starts.
 
-Schedules are configured in the web UI. Overnight windows (e.g. 22:00–06:00) are supported.
+Schedules are configured in the web UI. Each entry is a time window with an optional day specifier:
+
+| Format | Example | Meaning |
+|---|---|---|
+| `HH:MM – HH:MM` | `09:00 – 17:00` | Active every day between those times |
+| `day HH:MM – HH:MM` | `Mon-Fri 09:00 – 17:00` | Active on specified days only |
+
+**Day specifiers:**
+
+| Specifier | Meaning |
+|---|---|
+| `*` | Every day |
+| `Mon`, `Tue`, … `Sun` | Single day |
+| `Mon-Fri` | Inclusive day range |
+| `Sat,Sun` | Comma-separated list |
+
+Multiple windows can be added per site (e.g. weekdays plus a Saturday half-day). Overnight ranges are supported — if the end time is earlier than the start time the window wraps past midnight (e.g. `22:00 – 06:00`).
 
 ---
 
@@ -150,52 +161,19 @@ When internet connectivity is lost all browser windows navigate to a local offli
 
 ---
 
-## Window management (Linux)
+## Remote control
 
-On Linux the monitor uses `xdotool` and `wmctrl` to position and track windows. Install them if not already present:
+The web UI includes a live remote control view accessible from the **Home** tab. It shows a continuously updated screenshot of the display and lets you interact with the machine from any browser on the network.
 
-```bash
-sudo apt install xdotool wmctrl
-```
+**Available controls:**
 
-> **Note:** Run the monitor as a non-root user where possible. Running as root causes Chromium to display a `--no-sandbox` security warning.
-
----
-
-## Running on boot (Raspberry Pi)
-
-To start autodash automatically when the desktop loads, add an entry to the lxsession autostart file:
-
-```
-/home/<username>/.config/lxsession/rpd-x/autostart
-```
-
-Add this line at the end of the file (create the file if it does not exist):
-
-```
-@lxterminal -e python3 /home/<username>/autodash/start.py
-```
-
-Replace the path with the actual location of `start.py` on your system.
-
----
-
-## File overview
-
-| File | Purpose |
+| Control | Description |
 |---|---|
-| `monitor.py` | Main monitor — browser management, login, session keeping, web API |
-| `config.py` | `SiteConfig` dataclass and JSON helpers |
-| `auth.py` | Web UI authentication — password hashing and session management |
-| `auth.json` | Hashed web UI credentials (created on first login setup) |
-| `sites.json` | Site list — managed via the web UI |
-| `settings.json` | Global settings — managed via the web UI |
-| `ui.html` | Web-based configuration editor (served at `/ui`) |
-| `login.html` | Web UI login page |
-| `offline.html` | Fullscreen page shown when internet is unavailable |
-| `no_schedule.html` | Fullscreen page shown when no site is currently scheduled |
-| `site_unavailable.html` | Fullscreen page shown when a site cannot be reached |
-| `start.sh` | Bootstrap and launch script (Linux) |
-| `install.ps1` | Dependency install script (Windows) |
-| `uninstall.ps1` | Remove startup entry and virtual environment (Windows) |
-| `requirements.txt` | Python dependencies |
+| Click on screenshot | Sends a mouse click at that position |
+| Keyboard (while hovering) | All key presses are forwarded to the display |
+| **Send text** button | Types or pastes a block of text, with an option to press Enter after |
+| **F11 / Win / Esc / Enter** buttons | Quick single-key shortcuts |
+| **Pause / Resume** button | Temporarily suspends the scheduler (button turns red while paused) |
+| Monitor selector | Switch between physical monitors on multi-monitor setups |
+
+The screenshot refresh rate adjusts automatically — faster while you are actively clicking or typing, slower when idle. Both intervals are configurable in the **Settings** page under **Remote control**.
