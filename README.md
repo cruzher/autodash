@@ -172,8 +172,8 @@ The web UI includes a live remote control view accessible from the **Home** tab.
 | Click on screenshot | Sends a mouse click at that position |
 | Keyboard (while hovering) | All key presses are forwarded to the display |
 | **Send text** button | Types or pastes a block of text, with an option to press Enter after |
-| **F11 / Win / Esc / Enter** buttons | Quick single-key shortcuts |
-| **Pause / Resume** button | Temporarily suspends the scheduler (button turns red while paused) |
+| **⊞** button | Sends the Windows (Super) key |
+| **▶ Running / ⏸ Paused** button | Toggles the scheduler — shows current state and turns orange while paused |
 | Monitor selector | Switch between physical monitors on multi-monitor setups |
 
 The screenshot refresh rate adjusts automatically — faster while you are actively clicking or typing, slower when idle. Both intervals are configurable in the **Settings** page under **Remote control**.
