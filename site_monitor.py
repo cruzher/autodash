@@ -298,6 +298,7 @@ class SiteMonitor:
             else:
                 self.log.info("Already logged in.")
                 await self._maybe_goto_post_login()
+        await position_window(self.cfg, self.page)
 
     def _resolve_locator(self, selector: str):
         """Support role=button[name="Sign In"] syntax in addition to CSS/XPath."""
