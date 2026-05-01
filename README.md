@@ -177,3 +177,10 @@ The web UI includes a live remote control view accessible from the **Home** tab.
 | Monitor selector | Switch between physical monitors on multi-monitor setups |
 
 The screenshot refresh rate adjusts automatically — faster while you are actively clicking or typing, slower when idle. Both intervals are configurable in the **Settings** page under **Remote control**.
+
+---
+
+## Changelog
+
+### 2026-05-01
+- When a site is started, its window is now explicitly raised to the top of the z-order as the final step, preventing it from appearing behind other open windows. On Linux this uses `xdotool windowraise`; on Windows it uses the Win32 `SetForegroundWindow` / `BringWindowToTop` API.
