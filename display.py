@@ -149,6 +149,7 @@ def force_window_geometry(cfg, wid, log):
             run_cmd(["wmctrl", "-i", "-r", wid, "-e", geom])
         if HAS_XDOTOOL:
             run_cmd(["xdotool", "windowfocus", "--sync", wid])
+            run_cmd(["xdotool", "windowraise", wid])
             run_cmd(["xdotool", "windowmove",  "--sync", wid,
                      str(cfg.window_x), str(cfg.window_y)])
             run_cmd(["xdotool", "windowsize",  "--sync", wid,
@@ -213,6 +214,19 @@ async def position_window(cfg, page):
             logging.getLogger(cfg.name).warning("CDP positioning failed: %s", exc)
     await asyncio.sleep(0.3)
     await fit_viewport_to_window(page)
+    if platform.system() == "Windows":
+        try:
+            import ctypes
+            title = await page.title()
+            hwnd = ctypes.windll.user32.FindWindowW(None, title)
+            if hwnd:
+                ctypes.windll.user32.ShowWindow(hwnd, 9)
+                ctypes.windll.user32.SetForegroundWindow(hwnd)
+                ctypes.windll.user32.BringWindowToTop(hwnd)
+            else:
+                logging.getLogger(cfg.name).debug("raise window: no HWND found for %r", title)
+        except Exception as exc:
+            logging.getLogger(cfg.name).warning("raise window failed: %s", exc)
 
 
 async def display_keepalive():
