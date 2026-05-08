@@ -1067,12 +1067,20 @@ function app() {
 
     async setAutostart() {
       try {
-        await apiFetch("/autostart", {
+        const res = await apiFetch("/autostart", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ enabled: this.startAtLogin }),
         });
-      } catch(e) { /* non-critical */ }
+        if (res && !res.ok) {
+          const body = await res.json().catch(() => ({}));
+          alert("Failed to configure autostart: " + (body.error || res.statusText));
+          this.startAtLogin = !this.startAtLogin;
+        }
+      } catch(e) {
+        alert("Failed to configure autostart.");
+        this.startAtLogin = !this.startAtLogin;
+      }
     },
 
     async saveSettings() {

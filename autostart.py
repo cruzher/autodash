@@ -20,32 +20,62 @@ def supported() -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Windows — Scheduled Task
+# Windows — Registry (HKCU Run key, no admin rights needed)
 # ---------------------------------------------------------------------------
 
+_REG_RUN  = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
+_REG_NAME = "autodash"
+
+
+def _system_pythonw() -> Path:
+    """Return the pythonw.exe from the base Python that created the venv.
+
+    start.py is a bootstrap script that manages the venv itself, so it must
+    run with the system Python rather than the venv's own interpreter.
+    pyvenv.cfg always records the base interpreter's home directory.
+    """
+    cfg = _DIR / ".venv" / "pyvenv.cfg"
+    try:
+        for line in cfg.read_text(encoding="utf-8", errors="ignore").splitlines():
+            if line.lower().startswith("home"):
+                home = Path(line.split("=", 1)[1].strip())
+                pythonw = home / "pythonw.exe"
+                if pythonw.exists():
+                    return pythonw
+                python = home / "python.exe"
+                if python.exists():
+                    return python
+    except OSError:
+        pass
+    import sys
+    return Path(sys.executable)
+
+
 def _win_check() -> bool:
-    r = subprocess.run(
-        ["schtasks", "/query", "/tn", "autodash"],
-        capture_output=True,
-    )
-    return r.returncode == 0
+    import winreg
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _REG_RUN) as key:
+            winreg.QueryValueEx(key, _REG_NAME)
+            return True
+    except OSError:
+        return False
 
 
 def _win_enable() -> None:
-    py  = _venv_python()
+    import winreg
+    py  = _system_pythonw()
     cmd = f'"{py}" "{_SCRIPT}"'
-    subprocess.run(
-        ["schtasks", "/create", "/tn", "autodash",
-         "/tr", cmd, "/sc", "onlogon", "/f"],
-        check=True, capture_output=True,
-    )
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _REG_RUN, 0, winreg.KEY_SET_VALUE) as key:
+        winreg.SetValueEx(key, _REG_NAME, 0, winreg.REG_SZ, cmd)
 
 
 def _win_disable() -> None:
-    subprocess.run(
-        ["schtasks", "/delete", "/tn", "autodash", "/f"],
-        check=False, capture_output=True,
-    )
+    import winreg
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _REG_RUN, 0, winreg.KEY_SET_VALUE) as key:
+            winreg.DeleteValue(key, _REG_NAME)
+    except OSError:
+        pass
 
 
 # ---------------------------------------------------------------------------

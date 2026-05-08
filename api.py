@@ -122,10 +122,13 @@ def api_get_autostart(_: None = Depends(require_auth)):
 @api.post("/autostart")
 async def api_set_autostart(request: Request, _: None = Depends(require_auth)):
     body = await request.json()
-    if body.get("enabled"):
-        _autostart.enable()
-    else:
-        _autostart.disable()
+    try:
+        if body.get("enabled"):
+            _autostart.enable()
+        else:
+            _autostart.disable()
+    except Exception as exc:
+        return JSONResponse(status_code=500, content={"error": str(exc)})
     return {"ok": True}
 
 
