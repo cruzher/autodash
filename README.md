@@ -216,6 +216,7 @@ The **Settings** page in the web UI shows the current auto-login state.
 ### 2026-05-08
 - **Fix: Windows autostart not starting on login.** Switched from Task Scheduler to the `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run` registry key, which requires no admin rights and reliably triggers for the current user. Errors are now shown in the UI if enabling fails.
 - **Windows auto-login CLI tool.** Added `autologin.py`, a standalone script that configures Windows to log in automatically on boot by writing to the `HKLM\...\Winlogon` registry key. Requires an elevated terminal. The password is entered interactively and never stored by autodash. The Settings page now shows the current auto-login status.
+- **Fix: site window not raised to top when coming back on-schedule.** The "No Dashboard Scheduled" notice (fullscreen) was being closed after the site window was already opened, causing the site window to appear behind it. The notice is now closed before the site window is launched. Additionally improved the Windows window-raising logic to use `SetWindowPos(HWND_TOPMOST/HWND_NOTOPMOST)` and `AttachThreadInput` as more reliable alternatives to `SetForegroundWindow`.
 
 ### 2026-05-01
 - When a site is started, its window is now explicitly raised to the top of the z-order as the final step, preventing it from appearing behind other open windows. On Linux this uses `xdotool windowraise`; on Windows it uses the Win32 `SetForegroundWindow` / `BringWindowToTop` API.
