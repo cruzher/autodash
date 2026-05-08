@@ -521,7 +521,7 @@
               </template>
             </div>
             <template x-if="autostartSupported">
-              <div>
+              <div style="margin-top:18px;">
                 <div class="section-title">Startup</div>
                 <div class="field checkbox-row">
                   <input type="checkbox" id="start-at-login" x-model="startAtLogin" @change="setAutostart()">
@@ -531,7 +531,7 @@
               </div>
             </template>
             <template x-if="autologinSupported">
-              <div>
+              <div style="margin-top:18px;">
                 <div class="section-title">Auto-login</div>
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
                   <span style="font-size:12px;color:#9ca3af;">Status:</span>
