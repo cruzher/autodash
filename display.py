@@ -218,13 +218,22 @@ async def position_window(cfg, page):
         try:
             import ctypes
             title = await page.title()
-            hwnd = ctypes.windll.user32.FindWindowW(None, title)
-            if hwnd:
-                ctypes.windll.user32.ShowWindow(hwnd, 9)
-                ctypes.windll.user32.SetForegroundWindow(hwnd)
-                ctypes.windll.user32.BringWindowToTop(hwnd)
-            else:
-                logging.getLogger(cfg.name).debug("raise window: no HWND found for %r", title)
+            if title:
+                hwnd = ctypes.windll.user32.FindWindowW(None, title)
+                if hwnd:
+                    SWP_NOMOVE     = 0x0002
+                    SWP_NOSIZE     = 0x0001
+                    HWND_TOPMOST   = -1
+                    HWND_NOTOPMOST = -2
+                    ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+                    # HWND_TOPMOST/HWND_NOTOPMOST round-trip forces Z-order to top
+                    # without requiring foreground-process privilege (SetForegroundWindow
+                    # silently fails from a background process on Windows Vista+).
+                    ctypes.windll.user32.SetWindowPos(hwnd, HWND_TOPMOST,    0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
+                    ctypes.windll.user32.SetWindowPos(hwnd, HWND_NOTOPMOST,  0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
+                    ctypes.windll.user32.SetForegroundWindow(hwnd)
+                else:
+                    logging.getLogger(cfg.name).debug("raise window: no HWND found for %r", title)
         except Exception as exc:
             logging.getLogger(cfg.name).warning("raise window failed: %s", exc)
 
