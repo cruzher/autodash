@@ -530,6 +530,20 @@
                 <p class="hint" style="margin-top:6px;">When enabled, autodash will start automatically when you log in.</p>
               </div>
             </template>
+            <template x-if="autologinSupported">
+              <div>
+                <div class="section-title">Auto-login</div>
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                  <span style="font-size:12px;color:#9ca3af;">Status:</span>
+                  <span style="font-size:12px;font-weight:600;" :style="autologinEnabled ? 'color:#22c55e' : 'color:#6b7280'" x-text="autologinEnabled ? 'Enabled' : 'Disabled'"></span>
+                </div>
+                <p class="hint">Windows automatic logon requires Administrator privileges to configure. Use the bundled CLI tool from an elevated terminal:</p>
+                <pre style="margin-top:8px;padding:10px;background:#111;border-radius:6px;font-size:11px;color:#d1d5db;white-space:pre-wrap;">python autologin.py enable [--username &lt;user&gt;] [--domain &lt;domain&gt;]
+python autologin.py disable
+python autologin.py status</pre>
+                <p class="hint" style="margin-top:6px;">The password is entered interactively and is never stored by autodash. See the README for details.</p>
+              </div>
+            </template>
             <div class="section-title">Display</div>
             <div class="field checkbox-row">
               <input type="checkbox" id="sleep-when-idle" x-model="settings.sleep_when_idle">
@@ -665,6 +679,8 @@ function app() {
     sysinfo: null,
     startAtLogin: false,
     autostartSupported: false,
+    autologinEnabled: false,
+    autologinSupported: false,
     updating: false,
     updateOutput: "",
     updateDone: false,
@@ -720,6 +736,10 @@ function app() {
       try {
         const res = await apiFetch("/autostart");
         if (res) { const d = await res.json(); this.startAtLogin = d.enabled; this.autostartSupported = d.supported; }
+      } catch(e) { /* non-critical */ }
+      try {
+        const res = await apiFetch("/autologin");
+        if (res) { const d = await res.json(); this.autologinEnabled = d.enabled; this.autologinSupported = d.supported; }
       } catch(e) { /* non-critical */ }
       if (this.page === 'home') {
         await this.fetchScreenshots();

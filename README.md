@@ -180,6 +180,37 @@ The screenshot refresh rate adjusts automatically — faster while you are activ
 
 ---
 
+## Windows auto-login
+
+autodash includes a CLI tool to configure Windows to log in automatically on boot — useful for unattended kiosk machines that need to start without a password prompt.
+
+> **Requires Administrator.** The tool writes to `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon`, which requires an elevated terminal.
+
+### Usage
+
+Open PowerShell **as Administrator**, then run from the autodash directory:
+
+```powershell
+# Enable (defaults to the current logged-in user)
+python autologin.py enable
+
+# Enable for a specific user or domain
+python autologin.py enable --username kevin
+python autologin.py enable --username kevin --domain WORKGROUP
+
+# Disable auto-login
+python autologin.py disable
+
+# Check current state
+python autologin.py status
+```
+
+The password is always entered interactively via a secure prompt — it is never passed as a command-line argument and is not stored by autodash. The password is written to the registry by Windows itself as part of the standard auto-login mechanism.
+
+The **Settings** page in the web UI shows the current auto-login state.
+
+---
+
 ## Changelog
 
 ### 2026-05-01

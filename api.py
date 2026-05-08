@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Resp
 from pydantic import BaseModel
 
 import autostart as _autostart
+import autologin as _autologin
 import settings as _settings
 from auth import (
     SESSION_TTL,
@@ -116,6 +117,14 @@ def api_get_autostart(_: None = Depends(require_auth)):
     return JSONResponse(content={
         "enabled":   _autostart.is_enabled(),
         "supported": _autostart.supported(),
+    })
+
+
+@api.get("/autologin")
+def api_get_autologin(_: None = Depends(require_auth)):
+    return JSONResponse(content={
+        "enabled":   _autologin.is_enabled(),
+        "supported": _autologin.supported(),
     })
 
 
