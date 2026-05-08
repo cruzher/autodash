@@ -181,6 +181,7 @@ async def schedule_coordinator(monitors, pw):
                 if not (existing and not existing.done()):
                     log.info("Starting monitor '%s'.", m.cfg.name)
                     try:
+                        await notice.close()
                         await m.start()
                         t = asyncio.create_task(m.run_loop(), name=m.cfg.name)
                         t.add_done_callback(_make_task_done_cb(m.cfg.name, log))
