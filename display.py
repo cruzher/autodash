@@ -218,22 +218,39 @@ async def position_window(cfg, page):
         try:
             import ctypes
             title = await page.title()
+            hwnd = 0
             if title:
-                hwnd = ctypes.windll.user32.FindWindowW(None, title)
-                if hwnd:
-                    SWP_NOMOVE     = 0x0002
-                    SWP_NOSIZE     = 0x0001
-                    HWND_TOPMOST   = -1
-                    HWND_NOTOPMOST = -2
-                    ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-                    # HWND_TOPMOST/HWND_NOTOPMOST round-trip forces Z-order to top
-                    # without requiring foreground-process privilege (SetForegroundWindow
-                    # silently fails from a background process on Windows Vista+).
-                    ctypes.windll.user32.SetWindowPos(hwnd, HWND_TOPMOST,    0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
-                    ctypes.windll.user32.SetWindowPos(hwnd, HWND_NOTOPMOST,  0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
-                    ctypes.windll.user32.SetForegroundWindow(hwnd)
+                # Retry briefly: Chrome may not have pushed the title to the Win32
+                # window title yet even though Playwright already sees it.
+                for _ in range(5):
+                    hwnd = ctypes.windll.user32.FindWindowW(None, title)
+                    if hwnd:
+                        break
+                    await asyncio.sleep(0.2)
+            if hwnd:
+                user32          = ctypes.windll.user32
+                SWP_NOMOVE      = 0x0002
+                SWP_NOSIZE      = 0x0001
+                HWND_TOPMOST    = -1
+                HWND_NOTOPMOST  = -2
+                user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+                # HWND_TOPMOST/HWND_NOTOPMOST round-trip forces Z-order to top;
+                # SetWindowPos does not require foreground-process privilege.
+                user32.SetWindowPos(hwnd, HWND_TOPMOST,   0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
+                user32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
+                # AttachThreadInput lets us call SetForegroundWindow from a background
+                # process (direct calls are silently ignored on Windows Vista+).
+                fg_hwnd = user32.GetForegroundWindow()
+                fg_tid  = user32.GetWindowThreadProcessId(fg_hwnd, None)
+                my_tid  = ctypes.windll.kernel32.GetCurrentThreadId()
+                if fg_tid and fg_tid != my_tid:
+                    user32.AttachThreadInput(fg_tid, my_tid, True)
+                    user32.SetForegroundWindow(hwnd)
+                    user32.AttachThreadInput(fg_tid, my_tid, False)
                 else:
-                    logging.getLogger(cfg.name).debug("raise window: no HWND found for %r", title)
+                    user32.SetForegroundWindow(hwnd)
+            else:
+                logging.getLogger(cfg.name).debug("raise window: no HWND found for %r", title)
         except Exception as exc:
             logging.getLogger(cfg.name).warning("raise window failed: %s", exc)
 
