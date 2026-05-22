@@ -87,6 +87,19 @@ async def api_put_sites(request: Request, _: None = Depends(require_auth)):
     return {"ok": True}
 
 
+@api.post("/sites/{name}/pause")
+async def api_pause_site(name: str, request: Request, _: None = Depends(require_auth)):
+    body = await request.json()
+    paused = bool(body.get("paused", False))
+    data = json.loads(_SITES_JSON_PATH.read_text(encoding="utf-8"))
+    for site in data:
+        if site.get("name") == name:
+            site["schedule_paused"] = paused
+            break
+    _SITES_JSON_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    return {"ok": True}
+
+
 @api.get("/settings")
 def api_get_settings(_: None = Depends(require_auth)):
     return JSONResponse(content=_settings.load())

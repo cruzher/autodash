@@ -170,7 +170,7 @@ async def schedule_coordinator(monitors, pw):
         paused = _api_mod._scheduler_paused
 
         for m in monitors:
-            active = False if paused else is_scheduled_now(m.cfg.schedule)
+            active = False if (paused or m.cfg.schedule_paused) else is_scheduled_now(m.cfg.schedule)
             if active:
                 any_active = True
 

@@ -314,6 +314,11 @@
                 <span x-text="site.url"></span>
               </div>
               <div class="card-actions">
+                <button class="btn-secondary"
+                  :style="site.schedule_paused ? 'color:#16a34a;border-color:#16a34a;' : ''"
+                  style="font-size:12px;padding:3px 8px;"
+                  @click.stop="toggleSitePause(si)"
+                  x-text="site.schedule_paused ? '▶ Resume' : '⏸ Pause'"></button>
                 <button class="icon-btn" @click.stop="moveSite(si, -1)" title="Move up">&#8593;</button>
                 <button class="icon-btn" @click.stop="moveSite(si,  1)" title="Move down">&#8595;</button>
                 <button class="icon-btn danger" @click.stop="removeSite(si)" title="Delete">&#10005;</button>
@@ -719,7 +724,7 @@ function app() {
         const res = await apiFetch("/sites");
         if (!res) return;
         const data = await res.json();
-        this.sites = data.map(s => ({ _open: false, login_steps: [], post_login_steps: [], ...s }));
+        this.sites = data.map(s => ({ _open: false, schedule_paused: false, login_steps: [], post_login_steps: [], ...s }));
         if (this.sites.length) this.sites[0]._open = true;
         this.setStatus("Loaded", "ok");
       } catch(e) {
@@ -906,6 +911,17 @@ function app() {
       if (res && res.ok) { const d = await res.json(); this.schedulerPaused = d.paused; }
     },
 
+    async toggleSitePause(si) {
+      const site = this.sites[si];
+      const next = !site.schedule_paused;
+      const res = await apiFetch(`/sites/${encodeURIComponent(site.name)}/pause`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paused: next }),
+      });
+      if (res && res.ok) site.schedule_paused = next;
+    },
+
     async toggleSchedulerPause() {
       const next = !this.schedulerPaused;
       const res = await apiFetch("/scheduler/pause", {
@@ -972,7 +988,7 @@ function app() {
         const text = await file.text();
         const data = JSON.parse(text);
         if (!Array.isArray(data)) throw new Error("Expected a JSON array");
-        this.sites = data.map(s => ({ _open: false, login_steps: [], post_login_steps: [], ...s }));
+        this.sites = data.map(s => ({ _open: false, schedule_paused: false, login_steps: [], post_login_steps: [], ...s }));
         this.setStatus(`Imported ${data.length} site(s). Click Save to apply.`, "ok");
       } catch (e) {
         this.setStatus("Import failed: " + e.message, "err");
