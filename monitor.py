@@ -28,6 +28,12 @@ from scheduler import is_scheduled_now
 from site_monitor import SiteMonitor
 
 
+_RESTART_FIELDS = frozenset({"url", "username", "password", "totp_secret", "fullscreen"})
+
+def _requires_restart(old_cfg, new_cfg) -> bool:
+    return any(getattr(old_cfg, f) != getattr(new_cfg, f) for f in _RESTART_FIELDS)
+
+
 def _get_local_ip() -> str:
     import socket
     try:
@@ -169,7 +175,7 @@ async def schedule_coordinator(monitors, pw):
         any_active = False
         paused = _api_mod._scheduler_paused
 
-        for m in monitors:
+        for m in list(monitors):
             active = False if (paused or m.cfg.schedule_paused) else is_scheduled_now(m.cfg.schedule)
             if active:
                 any_active = True
@@ -255,12 +261,16 @@ async def schedule_coordinator(monitors, pw):
                         monitors.append(m)
                         was_active[m] = None
                     elif existing.cfg != cfg:
-                        log.info("config: changed for '%s', restarting.", cfg.name)
-                        await _stop_monitor(existing)
-                        profile_dir = Path(tempfile.mkdtemp(prefix=f"pw_profile_{cfg.name}_"))
-                        m = SiteMonitor(cfg, pw, profile_dir)
-                        monitors.append(m)
-                        was_active[m] = None
+                        if _requires_restart(existing.cfg, cfg):
+                            log.info("config: auth/launch change for '%s', restarting.", cfg.name)
+                            await _stop_monitor(existing)
+                            profile_dir = Path(tempfile.mkdtemp(prefix=f"pw_profile_{cfg.name}_"))
+                            m = SiteMonitor(cfg, pw, profile_dir)
+                            monitors.append(m)
+                            was_active[m] = None
+                        else:
+                            log.info("config: live update for '%s' (no restart).", cfg.name)
+                            await existing.update_config(cfg)
 
         await asyncio.sleep(SCHEDULE_CHECK_SECONDS)
 

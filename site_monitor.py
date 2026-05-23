@@ -76,6 +76,7 @@ class SiteMonitor:
         self._showing_offline      = False
         self._showing_unavailable  = False
         self._stable_geom = None
+        self._pending_reposition = False
         self.log          = logging.getLogger(cfg.name)
 
     def _write_profile_prefs(self):
@@ -206,6 +207,26 @@ class SiteMonitor:
         self._showing_offline     = False
         self._showing_unavailable = False
         self.log.info("Window closed by coordinator.")
+
+    async def update_config(self, new_cfg):
+        """Apply non-restart config changes in-place."""
+        old_cfg = self.cfg
+        self.cfg = new_cfg
+        self.log = logging.getLogger(new_cfg.name)
+
+        geom_fields = ("window_x", "window_y", "window_width", "window_height")
+        geom_changed = any(getattr(old_cfg, f) != getattr(new_cfg, f) for f in geom_fields)
+        if geom_changed and self._is_alive():
+            self.log.info(
+                "Applying new window geometry (%dx%d at %d,%d) without restart.",
+                new_cfg.window_width, new_cfg.window_height,
+                new_cfg.window_x, new_cfg.window_y,
+            )
+            await position_window(new_cfg, self.page)
+            if IS_LINUX and self._window_id and not new_cfg.fullscreen:
+                settled = get_window_geometry(self._window_id)
+                if settled:
+                    self._stable_geom = settled
 
     async def _show_offline_page(self):
         if self._showing_offline:
