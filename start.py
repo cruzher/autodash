@@ -126,6 +126,20 @@ def ensure_xdotool() -> None:
         print("[WARN] xdotool not found — install manually: sudo apt install xdotool")
 
 
+def ensure_cec_utils() -> None:
+    if not is_raspberry_pi():
+        return
+    if shutil.which("cec-client"):
+        return
+    if shutil.which("apt-get"):
+        print("[..] Installing cec-utils ...")
+        run("sudo", "apt-get", "install", "-y", "cec-utils", "-qq",
+            stdout=subprocess.DEVNULL)
+        print("[OK] cec-utils installed.")
+    else:
+        print("[WARN] cec-client not found — install manually: sudo apt install cec-utils")
+
+
 def ensure_venv() -> bool:
     activate = VENV / ("Scripts/Activate.ps1" if IS_WINDOWS else "bin/activate")
     if activate.exists():
@@ -193,6 +207,7 @@ def main() -> None:
     else:
         ensure_pi_defaults()
         ensure_xdotool()
+        ensure_cec_utils()
     venv_created  = ensure_venv()
     deps_updated  = install_deps(venv_created)
     install_playwright(deps_updated)

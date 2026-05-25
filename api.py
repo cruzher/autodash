@@ -36,6 +36,14 @@ _pyautogui_lock = threading.Lock()
 _scheduler_paused: bool = False
 
 
+def _is_raspberry_pi() -> bool:
+    try:
+        model = Path("/proc/device-tree/model").read_text()
+        return "Raspberry Pi" in model
+    except OSError:
+        return False
+
+
 class ClickRequest(BaseModel):
     x: float          # relative ratio 0.0–1.0
     y: float          # relative ratio 0.0–1.0
@@ -116,12 +124,13 @@ async def api_put_settings(request: Request, _: None = Depends(require_auth)):
 def api_get_sysinfo(_: None = Depends(require_auth)):
     import sys
     return JSONResponse(content={
-        "os":         platform.system(),
-        "os_version": platform.version(),
-        "os_release": platform.release(),
-        "machine":    platform.machine(),
-        "hostname":   platform.node(),
-        "python":     sys.version.split()[0],
+        "os":              platform.system(),
+        "os_version":      platform.version(),
+        "os_release":      platform.release(),
+        "machine":         platform.machine(),
+        "hostname":        platform.node(),
+        "python":          sys.version.split()[0],
+        "is_raspberry_pi": _is_raspberry_pi(),
     })
 
 

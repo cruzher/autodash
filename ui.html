@@ -513,7 +513,7 @@
             <div class="field-grid" style="grid-template-columns:auto 1fr;gap:4px 16px;">
               <template x-if="sysinfo">
                 <template x-for="[k,v] in Object.entries(sysinfo)" :key="k">
-                  <template x-if="true">
+                  <template x-if="k !== 'is_raspberry_pi'">
                     <div style="display:contents">
                       <span style="color:#9ca3af;font-size:12px;text-transform:capitalize;" x-text="k.replace('_',' ')"></span>
                       <span style="font-size:12px;font-family:monospace;" x-text="v"></span>
@@ -555,6 +555,16 @@ python autologin.py status</pre>
               <label for="sleep-when-idle">Allow display sleep when nothing is scheduled</label>
             </div>
             <p class="hint" style="margin-top:6px;">When enabled, the display is allowed to sleep normally during periods with no active dashboard. When disabled, the display stays awake at all times.</p>
+            <div class="field checkbox-row" style="margin-top:10px;" :style="sysinfo && !sysinfo.is_raspberry_pi ? 'opacity:0.4;pointer-events:none;' : ''">
+              <input type="checkbox" id="cec-enabled" x-model="settings.cec_enabled" :disabled="sysinfo && !sysinfo.is_raspberry_pi">
+              <label for="cec-enabled">Turn monitor on/off via HDMI-CEC based on schedule</label>
+            </div>
+            <template x-if="sysinfo && !sysinfo.is_raspberry_pi">
+              <p class="hint" style="margin-top:4px;color:#f59e0b;">CEC control is only supported on Raspberry Pi.</p>
+            </template>
+            <template x-if="!sysinfo || sysinfo.is_raspberry_pi">
+              <p class="hint" style="margin-top:4px;">When enabled, autodash sends a CEC power-on command when a dashboard becomes active and a standby command when nothing is scheduled.</p>
+            </template>
             <div class="section-title">Monitoring heartbeat</div>
             <div class="field-grid" style="grid-template-columns:1fr 1fr;">
               <div class="field">
@@ -680,7 +690,7 @@ function app() {
     saving: false,
     statusMsg: "",
     statusClass: "",
-    settings: { sleep_when_idle: true, heartbeat_url: "", heartbeat_interval: 60, auto_update: true, remote_active_interval: 2, remote_idle_interval: 30 },
+    settings: { sleep_when_idle: true, cec_enabled: false, heartbeat_url: "", heartbeat_interval: 60, auto_update: true, remote_active_interval: 2, remote_idle_interval: 30 },
     sysinfo: null,
     startAtLogin: false,
     autostartSupported: false,

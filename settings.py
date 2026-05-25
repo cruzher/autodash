@@ -5,6 +5,7 @@ _PATH = Path(__file__).parent / "settings.json"
 
 DEFAULTS: dict = {
     "sleep_when_idle":        True,
+    "cec_enabled":            False,
     "heartbeat_url":          "",
     "heartbeat_interval":     60,
     "auto_update":            True,
@@ -14,6 +15,7 @@ DEFAULTS: dict = {
 
 # Runtime state — mutated by apply()
 sleep_when_idle: bool = True
+cec_enabled:     bool = False
 heartbeat_url:   str  = ""
 heartbeat_interval: int = 60
 
@@ -28,8 +30,9 @@ def load() -> dict:
 
 
 def apply(s: dict) -> None:
-    global sleep_when_idle, heartbeat_url, heartbeat_interval
+    global sleep_when_idle, cec_enabled, heartbeat_url, heartbeat_interval
     sleep_when_idle    = bool(s.get("sleep_when_idle", True))
+    cec_enabled        = bool(s.get("cec_enabled", False))
     heartbeat_url      = str(s.get("heartbeat_url", "") or "")
     heartbeat_interval = max(10, int(s.get("heartbeat_interval", 60)))
 

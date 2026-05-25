@@ -13,6 +13,7 @@ import uvicorn
 from playwright.async_api import async_playwright
 
 import settings
+import cec as _cec
 import api as _api_mod
 from api import WEB_PORT, api
 from config import load_sites_json
@@ -109,6 +110,7 @@ class _NoticeWindow:
             self._context = None
 
         self._log.info("No monitors active — showing 'No dashboard scheduled' notice.")
+        _cec.standby()
         if settings.sleep_when_idle:
             enable_display_sleep()
         launch_env = {"DISPLAY": os.environ.get("DISPLAY", ":0")} if IS_LINUX else {}
@@ -140,6 +142,7 @@ class _NoticeWindow:
     async def close(self):
         disable_display_sleep()
         wake_display()
+        _cec.power_on()
         if self._context is None:
             return
         self._log.info("A monitor became active — closing notice window.")

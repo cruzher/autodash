@@ -213,6 +213,13 @@ The **Settings** page in the web UI shows the current auto-login state.
 
 ## Changelog
 
+### 2026-05-25
+- **HDMI-CEC monitor control (Raspberry Pi only).** autodash can now turn the display on and off via HDMI-CEC based on the schedule — sending a power-on command when a dashboard becomes active and a standby command when nothing is scheduled. Enable it in the Settings page under **Display**. The setting is grayed out with an explanation on non-Raspberry Pi systems. Requires `cec-utils` (`cec-client`), which `start.py` installs automatically on Raspberry Pi.
+
+### 2026-05-21
+- **Smart config hot-reload — no unnecessary restarts.** Changing a site's settings no longer always restarts its browser window. Only changes to `url`, `username`, `password`, `totp_secret`, or `fullscreen` require a restart. All other settings (schedule, refresh interval, availability check, selectors, post-login URL, etc.) are picked up immediately without touching the running browser. Window geometry changes (`window_x/y/width/height`) are applied by resizing and repositioning the live window in place.
+- **Fix: unrelated sites unaffected by config changes.** The reconciliation loop now exclusively targets the site whose config changed; other running sites are left completely untouched.
+
 ### 2026-05-08
 - **Fix: Windows autostart not starting on login.** Switched from Task Scheduler to the `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run` registry key, which requires no admin rights and reliably triggers for the current user. Errors are now shown in the UI if enabling fails.
 - **Windows auto-login CLI tool.** Added `autologin.py`, a standalone script that configures Windows to log in automatically on boot by writing to the `HKLM\...\Winlogon` registry key. Requires an elevated terminal. The password is entered interactively and never stored by autodash. The Settings page now shows the current auto-login status.
