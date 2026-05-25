@@ -10,13 +10,15 @@ def _send(command: str) -> None:
     if not settings.cec_enabled:
         return
     try:
-        subprocess.run(
+        proc = subprocess.Popen(
             ["cec-client", "-s", "-d", "1"],
-            input=command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             text=True,
-            timeout=5,
-            capture_output=True,
         )
+        proc.stdin.write(command + "\n")
+        proc.stdin.close()
     except FileNotFoundError:
         _log.warning("cec-client not found — CEC command skipped.")
     except Exception as exc:
