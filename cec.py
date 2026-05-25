@@ -46,10 +46,14 @@ def _send(command: str) -> None:
 
 
 def standby() -> None:
+    if not settings.cec_enabled:
+        return
     _log.info("CEC: sending standby.")
     _send("standby 0")
 
 
 def power_on() -> None:
+    if not settings.cec_enabled:
+        return
     _log.info("CEC: sending power on.")
     _send("on 0")
