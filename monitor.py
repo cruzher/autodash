@@ -94,6 +94,7 @@ class _NoticeWindow:
     def __init__(self, pw):
         self._pw      = pw
         self._context = None
+        self._boot    = True
         self._log     = logging.getLogger("coordinator")
 
     async def open(self):
@@ -142,6 +143,10 @@ class _NoticeWindow:
     async def close(self):
         disable_display_sleep()
         wake_display()
+        send_cec = self._context is not None or self._boot
+        self._boot = False
+        if not send_cec:
+            return
         _cec.power_on()
         if self._context is None:
             return
