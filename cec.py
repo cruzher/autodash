@@ -41,6 +41,7 @@ def _send(command: str) -> None:
             )
             proc.stdin.write(command + "\n")
             proc.stdin.close()
+            proc.wait()
         except Exception as exc:
             _log.warning("CEC command failed for adapter %s: %s", adapter, exc)
 

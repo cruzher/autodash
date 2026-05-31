@@ -196,8 +196,8 @@ async def position_window(cfg, page):
                 "Could not find window ID for initial positioning."
             )
     else:
+        session = await page.context.new_cdp_session(page)
         try:
-            session = await page.context.new_cdp_session(page)
             result  = await session.send("Browser.getWindowForTarget")
             win_id  = result["windowId"]
             await session.send("Browser.setWindowBounds", {
@@ -209,9 +209,10 @@ async def position_window(cfg, page):
                     "height": cfg.window_height,
                 },
             })
-            await session.detach()
         except Exception as exc:
             logging.getLogger(cfg.name).warning("CDP positioning failed: %s", exc)
+        finally:
+            await session.detach()
     await asyncio.sleep(0.3)
     await fit_viewport_to_window(page)
     if platform.system() == "Windows":

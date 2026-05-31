@@ -37,6 +37,7 @@ async def check_site_available(url: str) -> bool:
                 resp.close()
             except urllib.error.HTTPError as exc:
                 status = exc.code
+                exc.close()
             return status < 500
         except Exception:
             return False

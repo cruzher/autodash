@@ -213,6 +213,12 @@ The **Settings** page in the web UI shows the current auto-login state.
 
 ## Changelog
 
+### 2026-05-31
+- **Fix: zombie processes from CEC commands.** Each call to `_send()` in `cec.py` now calls `proc.wait()` after closing stdin, so the subprocess is reaped immediately instead of accumulating as zombies over the lifetime of the process.
+- **Fix: socket leak on HTTP availability checks.** `urllib.error.HTTPError` is itself a response object wrapping an open socket. `connectivity.py` now calls `exc.close()` on the error so the socket is released on 4xx responses (e.g. 401 on login-protected dashboards).
+- **Fix: CDP session leak on window positioning failure.** `display.py` now uses a `try/finally` block to ensure `session.detach()` is always called, even when a `Browser.getWindowForTarget` or `Browser.setWindowBounds` call fails.
+- **Fix: unbounded session token accumulation in auth.** `auth.py` now purges all expired tokens from the in-memory `_sessions` dict each time a new session is created, preventing slow memory growth on long-running instances.
+
 ### 2026-05-25
 - **HDMI-CEC monitor control (Raspberry Pi only).** autodash can now turn the display on and off via HDMI-CEC based on the schedule — sending a power-on command when a dashboard becomes active and a standby command when nothing is scheduled. Enable it in the Settings page under **Display**. The setting is grayed out with an explanation on non-Raspberry Pi systems. Requires `cec-utils` (`cec-client`), which `start.py` installs automatically on Raspberry Pi.
 

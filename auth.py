@@ -68,8 +68,12 @@ def check_credentials(username: str, password: str) -> bool:
 # ---- session management -----------------------------------------------------
 
 def create_session() -> str:
+    now = time.time()
+    expired = [t for t, exp in _sessions.items() if exp <= now]
+    for t in expired:
+        del _sessions[t]
     token = secrets.token_urlsafe(32)
-    _sessions[token] = time.time() + SESSION_TTL
+    _sessions[token] = now + SESSION_TTL
     return token
 
 
