@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import platform
+import shutil
 import socket
 import subprocess
 from pathlib import Path
@@ -308,14 +309,16 @@ def api_novnc_status(_: None = Depends(require_auth)):
 def api_novnc_start(_: None = Depends(require_auth)):
     if not _is_raspberry_pi():
         return JSONResponse(status_code=403, content={"error": "Raspberry Pi only"})
+    if not _check_vnc_port():
+        return JSONResponse(status_code=503, content={"error": "VNC server not reachable on port 5900"})
     global _novnc_process
     if _novnc_process is not None and _novnc_process.poll() is None:
         return JSONResponse(content={"port": _WEBSOCKIFY_PORT})
+    ws = shutil.which("websockify")
+    if not ws:
+        return JSONResponse(status_code=503, content={"error": "websockify not found in PATH"})
     try:
-        _novnc_process = subprocess.Popen([
-            "websockify", str(_WEBSOCKIFY_PORT), "localhost:5900",
-            "--web", str(_NOVNC_PATH),
-        ])
+        _novnc_process = subprocess.Popen([ws, str(_WEBSOCKIFY_PORT), "localhost:5900"])
         return JSONResponse(content={"port": _WEBSOCKIFY_PORT})
     except Exception as exc:
         return JSONResponse(status_code=500, content={"error": str(exc)})
