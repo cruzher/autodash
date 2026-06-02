@@ -833,7 +833,10 @@ function app() {
       this.novncStatus = "Starting…";
       const res = await apiFetch("/novnc/start", { method: "POST" });
       if (res && res.ok) { this.novncRunning = true; this.novncStatus = "Running"; }
-      else this.novncStatus = "Failed to start";
+      else {
+        const body = await res.json().catch(() => ({}));
+        this.novncStatus = body.error || "Failed to start";
+      }
     },
 
     async stopNovnc() {

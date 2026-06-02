@@ -5,6 +5,7 @@ import platform
 import shutil
 import socket
 import subprocess
+import time
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Form, Request
@@ -318,7 +319,21 @@ def api_novnc_start(_: None = Depends(require_auth)):
     if not ws:
         return JSONResponse(status_code=503, content={"error": "websockify not found in PATH"})
     try:
-        _novnc_process = subprocess.Popen([ws, str(_WEBSOCKIFY_PORT), "localhost:5900"])
+        log = open(_LOG_PATH, "a", encoding="utf-8")
+        _novnc_process = subprocess.Popen(
+            [ws, str(_WEBSOCKIFY_PORT), "localhost:5900"],
+            stdout=log, stderr=log,
+        )
+        # Wait up to 2 s for websockify to bind the port
+        for _ in range(10):
+            time.sleep(0.2)
+            if _novnc_process.poll() is not None:
+                return JSONResponse(status_code=500, content={"error": "websockify exited immediately — check autodash.log"})
+            try:
+                with socket.create_connection(("127.0.0.1", _WEBSOCKIFY_PORT), timeout=0.1):
+                    return JSONResponse(content={"port": _WEBSOCKIFY_PORT})
+            except OSError:
+                continue
         return JSONResponse(content={"port": _WEBSOCKIFY_PORT})
     except Exception as exc:
         return JSONResponse(status_code=500, content={"error": str(exc)})
