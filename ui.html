@@ -589,8 +589,8 @@ python autologin.py status</pre>
       <div style="flex:1;min-height:0;display:flex;flex-direction:column;">
         <template x-if="!novncVncAvailable">
           <div style="padding:24px;">
-            <p style="color:#6b7280;font-size:13px;">VNC server not detected on port 5900.</p>
-            <p class="hint" style="margin-top:8px;">Enable VNC via: <code>sudo raspi-config</code> → Interface Options → VNC</p>
+            <p style="color:#6b7280;font-size:13px;">x11vnc is not installed.</p>
+            <p class="hint" style="margin-top:8px;">Install with: <code>sudo apt install x11vnc</code>, then restart autodash.</p>
           </div>
         </template>
         <template x-if="novncVncAvailable && !novncFilesAvailable">
@@ -820,13 +820,13 @@ function app() {
       const res = await apiFetch("/novnc/status");
       if (!res || res.status === 403) { this.novncStatus = ""; return; }
       const d = await res.json();
-      this.novncVncAvailable   = d.vnc_available;
+      this.novncVncAvailable   = d.x11vnc_available;
       this.novncFilesAvailable = d.files_available;
       this.novncRunning        = d.proxy_running;
-      if (d.proxy_running)       this.novncStatus = "Running";
-      else if (!d.vnc_available) this.novncStatus = "VNC not found";
-      else if (!d.files_available) this.novncStatus = "noVNC not installed";
-      else                       this.novncStatus = "Ready";
+      if (d.proxy_running)          this.novncStatus = "Running";
+      else if (!d.x11vnc_available) this.novncStatus = "x11vnc not installed";
+      else if (!d.files_available)  this.novncStatus = "noVNC not installed";
+      else                          this.novncStatus = "Ready";
     },
 
     async startNovnc() {

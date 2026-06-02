@@ -154,20 +154,18 @@ def ensure_novnc() -> None:
         print("[WARN] novnc not found — install manually: sudo apt install novnc")
 
 
-def ensure_vnc_enabled() -> None:
+def ensure_x11vnc() -> None:
     if not is_raspberry_pi():
         return
-    result = run("systemctl", "is-enabled", "vncserver-x11-serviced", check=False,
-                 capture_output=True, text=True)
-    if result.stdout.strip() == "enabled":
+    if shutil.which("x11vnc"):
         return
-    print("[..] Enabling VNC server ...")
-    result = run("sudo", "systemctl", "enable", "--now", "vncserver-x11-serviced", check=False)
-    if result.returncode == 0:
-        print("[OK] VNC server enabled.")
+    if shutil.which("apt-get"):
+        print("[..] Installing x11vnc ...")
+        run("sudo", "apt-get", "install", "-y", "x11vnc", "-qq",
+            stdout=subprocess.DEVNULL)
+        print("[OK] x11vnc installed.")
     else:
-        print("[WARN] Could not enable VNC automatically.")
-        print("       Run manually: sudo raspi-config → Interface Options → VNC")
+        print("[WARN] x11vnc not found — install manually: sudo apt install x11vnc")
 
 
 def ensure_venv() -> bool:
@@ -239,7 +237,7 @@ def main() -> None:
         ensure_xdotool()
         ensure_cec_utils()
         ensure_novnc()
-        ensure_vnc_enabled()
+        ensure_x11vnc()
     venv_created  = ensure_venv()
     deps_updated  = install_deps(venv_created)
     install_playwright(deps_updated)

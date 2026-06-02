@@ -37,7 +37,9 @@ _scheduler_paused: bool = False
 
 _NOVNC_PATH = Path("/usr/share/novnc")
 _WEBSOCKIFY_PORT = 6080
-_novnc_process = None  # subprocess.Popen or None
+_X11VNC_PORT = 5901
+_novnc_process = None   # websockify subprocess
+_x11vnc_process = None  # x11vnc subprocess
 
 
 def _is_raspberry_pi() -> bool:
@@ -57,9 +59,9 @@ if _NOVNC_PATH.exists():
 
 @api.on_event("shutdown")
 def _on_shutdown():
-    global _novnc_process
-    if _novnc_process and _novnc_process.poll() is None:
-        _novnc_process.terminate()
+    for proc in (_novnc_process, _x11vnc_process):
+        if proc and proc.poll() is None:
+            proc.terminate()
 
 
 @api.get("/scheduler/pause")
@@ -284,25 +286,53 @@ async def api_monitors(_: None = Depends(require_auth)):
         ]
 
 
-def _check_vnc_port() -> bool:
+def _check_port(port: int) -> bool:
     try:
-        with socket.create_connection(("127.0.0.1", 5900), timeout=1.0):
+        with socket.create_connection(("127.0.0.1", port), timeout=1.0):
             return True
     except OSError:
         return False
+
+
+def _wait_for_port(port: int, retries: int = 10, delay: float = 0.3) -> bool:
+    for _ in range(retries):
+        time.sleep(delay)
+        if _check_port(port):
+            return True
+    return False
+
+
+def _start_x11vnc():
+    global _x11vnc_process
+    if _x11vnc_process is not None and _x11vnc_process.poll() is None:
+        return None
+    x11 = shutil.which("x11vnc")
+    if not x11:
+        return "x11vnc not found — run: sudo apt install x11vnc"
+    if _check_port(_X11VNC_PORT):
+        return None  # already something running on the port
+    log = open(_LOG_PATH, "a", encoding="utf-8")
+    _x11vnc_process = subprocess.Popen(
+        [x11, "-nopw", "-forever", "-display", ":0", "-rfbport", str(_X11VNC_PORT)],
+        stdout=log, stderr=log,
+    )
+    if not _wait_for_port(_X11VNC_PORT):
+        if _x11vnc_process.poll() is not None:
+            return "x11vnc exited immediately — check autodash.log"
+        return "x11vnc did not bind port in time"
+    return None
 
 
 @api.get("/novnc/status")
 def api_novnc_status(_: None = Depends(require_auth)):
     if not _is_raspberry_pi():
         return JSONResponse(status_code=403, content={"error": "Raspberry Pi only"})
-    global _novnc_process
     proxy_running = _novnc_process is not None and _novnc_process.poll() is None
     return JSONResponse(content={
-        "vnc_available":   _check_vnc_port(),
-        "files_available": _NOVNC_PATH.exists(),
-        "proxy_running":   proxy_running,
-        "proxy_port":      _WEBSOCKIFY_PORT,
+        "x11vnc_available": bool(shutil.which("x11vnc")),
+        "files_available":  _NOVNC_PATH.exists(),
+        "proxy_running":    proxy_running,
+        "proxy_port":       _WEBSOCKIFY_PORT,
     })
 
 
@@ -310,30 +340,24 @@ def api_novnc_status(_: None = Depends(require_auth)):
 def api_novnc_start(_: None = Depends(require_auth)):
     if not _is_raspberry_pi():
         return JSONResponse(status_code=403, content={"error": "Raspberry Pi only"})
-    if not _check_vnc_port():
-        return JSONResponse(status_code=503, content={"error": "VNC server not reachable on port 5900"})
     global _novnc_process
     if _novnc_process is not None and _novnc_process.poll() is None:
         return JSONResponse(content={"port": _WEBSOCKIFY_PORT})
+    err = _start_x11vnc()
+    if err:
+        return JSONResponse(status_code=503, content={"error": err})
     ws = shutil.which("websockify")
     if not ws:
-        return JSONResponse(status_code=503, content={"error": "websockify not found in PATH"})
+        return JSONResponse(status_code=503, content={"error": "websockify not found — run: sudo apt install novnc"})
     try:
         log = open(_LOG_PATH, "a", encoding="utf-8")
         _novnc_process = subprocess.Popen(
-            [ws, str(_WEBSOCKIFY_PORT), "localhost:5900"],
+            [ws, str(_WEBSOCKIFY_PORT), f"localhost:{_X11VNC_PORT}"],
             stdout=log, stderr=log,
         )
-        # Wait up to 2 s for websockify to bind the port
-        for _ in range(10):
-            time.sleep(0.2)
+        if not _wait_for_port(_WEBSOCKIFY_PORT):
             if _novnc_process.poll() is not None:
                 return JSONResponse(status_code=500, content={"error": "websockify exited immediately — check autodash.log"})
-            try:
-                with socket.create_connection(("127.0.0.1", _WEBSOCKIFY_PORT), timeout=0.1):
-                    return JSONResponse(content={"port": _WEBSOCKIFY_PORT})
-            except OSError:
-                continue
         return JSONResponse(content={"port": _WEBSOCKIFY_PORT})
     except Exception as exc:
         return JSONResponse(status_code=500, content={"error": str(exc)})
@@ -343,8 +367,10 @@ def api_novnc_start(_: None = Depends(require_auth)):
 def api_novnc_stop(_: None = Depends(require_auth)):
     if not _is_raspberry_pi():
         return JSONResponse(status_code=403, content={"error": "Raspberry Pi only"})
-    global _novnc_process
-    if _novnc_process and _novnc_process.poll() is None:
-        _novnc_process.terminate()
+    global _novnc_process, _x11vnc_process
+    for proc in (_novnc_process, _x11vnc_process):
+        if proc and proc.poll() is None:
+            proc.terminate()
     _novnc_process = None
+    _x11vnc_process = None
     return {"ok": True}
