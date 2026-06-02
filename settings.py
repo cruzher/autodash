@@ -9,8 +9,6 @@ DEFAULTS: dict = {
     "heartbeat_url":          "",
     "heartbeat_interval":     60,
     "auto_update":            True,
-    "remote_active_interval": 2,
-    "remote_idle_interval":   30,
 }
 
 # Runtime state — mutated by apply()

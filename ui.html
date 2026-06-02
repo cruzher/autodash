@@ -130,7 +130,7 @@
     <p>Dashboard manager</p>
   </div>
   <nav class="sidebar-nav">
-    <button class="nav-btn" :class="page === 'home' && 'active'" @click="page = 'home'; fetchScreenshots()">
+    <button class="nav-btn" :class="page === 'home' && 'active'" @click="page = 'home'; fetchScreenshot(); fetchMonitors()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
         <polyline points="9 22 9 12 15 12 15 22"/>
@@ -161,6 +161,16 @@
       </svg>
       Logs
     </button>
+    <template x-if="sysinfo && sysinfo.is_raspberry_pi">
+      <button class="nav-btn" :class="page === 'remote' && 'active'" @click="page = 'remote'; initNovnc()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+          <line x1="8" y1="21" x2="16" y2="21"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+        Remote Control
+      </button>
+    </template>
   </nav>
   <div class="sidebar-footer">
     <button class="signout-btn" @click="signOut()">
@@ -189,7 +199,7 @@
         <template x-if="monitors.length > 1">
           <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
             <label style="font-size:13px;color:#9ca3af;">Monitor</label>
-            <select x-model.number="selectedMonitor" @change="fetchScreenshots()"
+            <select x-model.number="selectedMonitor" @change="fetchScreenshot()"
                     style="background:#1f2937;color:#f9fafb;border:1px solid #374151;border-radius:4px;padding:4px 8px;font-size:13px;">
               <template x-for="m in monitors" :key="m.index">
                 <option :value="m.index" x-text="m.label"></option>
@@ -201,7 +211,7 @@
         <!-- Display card -->
         <div class="site-card">
           <div class="card-header" style="cursor:default;">
-            <!-- Left: remote control buttons -->
+            <!-- Left: scheduler controls -->
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
               <button class="btn-secondary"
                       :style="schedulerPaused ? 'background:#fff7ed;color:#ea580c;border-color:#fed7aa;' : ''"
@@ -209,13 +219,6 @@
                       :title="schedulerPaused ? 'Resume scheduled sites' : 'Pause scheduled sites'">
                 <span x-text="schedulerPaused ? '⏸ Paused' : '▶ Running'"></span>
               </button>
-              <span style="width:1px;height:20px;background:#d1d5db;display:inline-block;flex-shrink:0;"></span>
-              <button class="btn-secondary" @click="sendKey('super')">⊞</button>
-              <span style="width:1px;height:20px;background:#d1d5db;display:inline-block;flex-shrink:0;"></span>
-              <button class="btn-secondary" @click="showTextPopup = true; $nextTick(() => $refs.textInput.focus())">Send text</button>
-              <span x-show="remoteFeedback || clickFeedback"
-                    x-text="remoteFeedback || clickFeedback"
-                    style="font-size:12px;color:#34d399;"></span>
             </div>
             <!-- Right: updated timestamp + refresh + live status -->
             <div style="display:flex;align-items:center;gap:8px;">
@@ -225,7 +228,7 @@
                       :title="displayFitMode ? 'Switch to actual resolution' : 'Switch to fit window'"
                       @click="displayFitMode = !displayFitMode"
                       x-text="displayFitMode ? 'Fit' : 'Actual'"></button>
-              <button class="btn-secondary" @click="fetchScreenshots()">Refresh</button>
+              <button class="btn-secondary" @click="fetchScreenshot()">Refresh</button>
               <span class="status" :class="screenshotError ? 'err' : 'ok'"
                     x-text="screenshotError || 'live'"></span>
             </div>
@@ -235,12 +238,10 @@
             : 'background:#111827;border-radius:0 0 8px 8px;overflow:auto;line-height:0;'">
             <template x-if="screenshotSrc">
               <img :src="screenshotSrc"
-                   :style="displayFitMode ? 'max-width:100%;max-height:calc(100vh - 160px);width:auto;height:auto;display:block;cursor:crosshair;' : 'display:block;cursor:crosshair;'"
+                   :style="displayFitMode ? 'max-width:100%;max-height:calc(100vh - 160px);width:auto;height:auto;display:block;cursor:pointer;' : 'display:block;cursor:pointer;'"
                    alt="Display screenshot"
-                   @click="sendClick($event)"
-                   @contextmenu="sendRightClick($event)"
-                   @mouseenter="setKeyCapture(true)"
-                   @mouseleave="setKeyCapture(false)">
+                   @click="fetchScreenshot()"
+                   @contextmenu.prevent>
             </template>
             <template x-if="!screenshotSrc && screenshotError">
               <div style="padding:40px;text-align:center;color:#6b7280;font-size:13px;" x-text="screenshotError"></div>
@@ -251,33 +252,6 @@
           </div>
         </div>
 
-      </div>
-
-      <!-- Send text popup -->
-      <div x-show="showTextPopup" class="modal-overlay" @click.self="showTextPopup = false">
-        <div class="site-card" style="width:420px;max-width:90vw;margin:0;">
-          <div class="card-header" style="cursor:default;">
-            <div class="card-title">Send text</div>
-            <button class="icon-btn" @click="showTextPopup = false" title="Close">&#10005;</button>
-          </div>
-          <div class="card-body">
-            <textarea x-model="remoteText"
-                      x-ref="textInput"
-                      placeholder="Type text to send…"
-                      rows="6"
-                      style="width:100%;border:1px solid #d1d5db;border-radius:5px;padding:6px 8px;color:#111827;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
-            <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
-              <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#6b7280;cursor:pointer;">
-                <input type="checkbox" x-model="remoteTextEnter" style="accent-color:#2563eb;">
-                Send Enter after
-              </label>
-              <div style="display:flex;gap:6px;">
-                <button class="btn-secondary" @click="sendText('type')" :disabled="!remoteText">Type text</button>
-                <button class="btn-primary" @click="sendText('paste')" :disabled="!remoteText">Paste text</button>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
     </div>
@@ -577,18 +551,6 @@ python autologin.py status</pre>
               </div>
             </div>
             <p class="hint" style="margin-top:6px;">When set, autodash will GET the webhook URL at the configured interval so external monitoring services know the system is alive.</p>
-            <div class="section-title">Remote control</div>
-            <div class="field-grid" style="grid-template-columns:1fr 1fr;">
-              <div class="field">
-                <label>Active refresh interval (seconds)</label>
-                <input type="number" min="1" step="1" x-model.number="settings.remote_active_interval">
-              </div>
-              <div class="field">
-                <label>Idle refresh interval (seconds)</label>
-                <input type="number" min="5" step="5" x-model.number="settings.remote_idle_interval">
-              </div>
-            </div>
-            <p class="hint" style="margin-top:6px;">Screenshot refresh rate when remotely controlling (active) vs. when idle. Active mode is triggered by mouse or keyboard input and times out after 10 seconds of inactivity.</p>
             <div class="section-title">Updates</div>
             <div class="field checkbox-row" style="margin-bottom:10px;">
               <input type="checkbox" id="auto-update" x-model="settings.auto_update">
@@ -605,6 +567,47 @@ python autologin.py status</pre>
             </template>
           </div>
         </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- Remote Control page (Raspberry Pi only) -->
+  <template x-if="page === 'remote'">
+    <div style="display:flex;flex-direction:column;flex:1;min-height:0;">
+      <div class="topbar">
+        <h2>Remote Control</h2>
+        <div class="topbar-actions">
+          <template x-if="novncRunning">
+            <button class="btn-secondary" @click="stopNovnc()">Stop</button>
+          </template>
+          <template x-if="!novncRunning && novncVncAvailable && novncFilesAvailable">
+            <button class="btn-primary" @click="startNovnc()">Start</button>
+          </template>
+          <span class="status" x-text="novncStatus"></span>
+        </div>
+      </div>
+      <div style="flex:1;min-height:0;display:flex;flex-direction:column;">
+        <template x-if="!novncVncAvailable">
+          <div style="padding:24px;">
+            <p style="color:#6b7280;font-size:13px;">VNC server not detected on port 5900.</p>
+            <p class="hint" style="margin-top:8px;">Enable VNC via: <code>sudo raspi-config</code> → Interface Options → VNC</p>
+          </div>
+        </template>
+        <template x-if="novncVncAvailable && !novncFilesAvailable">
+          <div style="padding:24px;">
+            <p style="color:#6b7280;font-size:13px;">noVNC is not installed.</p>
+            <p class="hint" style="margin-top:8px;">Install with: <code>sudo apt install novnc</code>, then restart autodash.</p>
+          </div>
+        </template>
+        <template x-if="novncVncAvailable && novncFilesAvailable && !novncRunning">
+          <div style="padding:24px;">
+            <p style="color:#6b7280;font-size:13px;">Click <strong>Start</strong> to launch the remote session.</p>
+            <p class="hint" style="margin-top:8px;">Ensure VNC is password-protected. The session uses VNC's own authentication.</p>
+          </div>
+        </template>
+        <template x-if="novncRunning">
+          <iframe :src="novncIframeUrl()" style="flex:1;width:100%;border:none;min-height:calc(100vh - 60px);"></iframe>
+        </template>
       </div>
     </div>
   </template>
@@ -690,7 +693,7 @@ function app() {
     saving: false,
     statusMsg: "",
     statusClass: "",
-    settings: { sleep_when_idle: true, cec_enabled: false, heartbeat_url: "", heartbeat_interval: 60, auto_update: true, remote_active_interval: 2, remote_idle_interval: 30 },
+    settings: { sleep_when_idle: true, cec_enabled: false, heartbeat_url: "", heartbeat_interval: 60, auto_update: true },
     sysinfo: null,
     startAtLogin: false,
     autostartSupported: false,
@@ -711,21 +714,13 @@ function app() {
     screenshotSrc: null,
     screenshotError: null,
     screenshotUpdated: "",
-    _screenshotTimer: null,
     monitors: [],
     selectedMonitor: 1,
-    showTextPopup: false,
-    remoteText: "",
-    remoteTextEnter: false,
-    remoteFeedback: "",
-    _remoteFeedbackTimer: null,
-    clickFeedback: "",
-    _clickFeedbackTimer: null,
-    keyCapture: false,
-    _keyCaptureHandler: null,
-    remoteActive: false,
-    _remoteIdleTimer: null,
     schedulerPaused: false,
+    novncVncAvailable: false,
+    novncFilesAvailable: false,
+    novncRunning: false,
+    novncStatus: "",
     schedDayHint: "Day spec: Mon-Fri, Sat,Sun, Mon, * (every day)",
     schedTimeHint: "Time in HH:MM format, e.g. 09:00",
 
@@ -757,44 +752,13 @@ function app() {
         if (res) { const d = await res.json(); this.autologinEnabled = d.enabled; this.autologinSupported = d.supported; }
       } catch(e) { /* non-critical */ }
       if (this.page === 'home') {
-        await this.fetchScreenshots();
+        await this.fetchScreenshot();
         this.fetchMonitors();
       }
       this.fetchSchedulerPause();
-      this.scheduleScreenshot();
-      document.addEventListener('visibilitychange', () => this.scheduleScreenshot());
-      // Sync keyboard capture and screenshot scheduler when navigating
-      this.$watch('page', (newPage) => {
-        if (newPage !== 'home' && this.keyCapture) this.setKeyCapture(false);
-        this.scheduleScreenshot();
-      });
     },
 
-    scheduleScreenshot() {
-      clearTimeout(this._screenshotTimer);
-      if (this.page !== 'home' || document.visibilityState === 'hidden') return;
-      const ms = (this.remoteActive
-        ? (this.settings.remote_active_interval || 2)
-        : (this.settings.remote_idle_interval  || 30)) * 1000;
-      this._screenshotTimer = setTimeout(async () => {
-        await this.fetchScreenshots();
-        this.scheduleScreenshot();
-      }, ms);
-    },
-
-    onRemoteActivity() {
-      if (!this.remoteActive) {
-        this.remoteActive = true;
-        this.scheduleScreenshot();
-      }
-      clearTimeout(this._remoteIdleTimer);
-      this._remoteIdleTimer = setTimeout(() => {
-        this.remoteActive = false;
-        this.scheduleScreenshot();
-      }, 10000);
-    },
-
-    async fetchScreenshots() {
+    async fetchScreenshot() {
       try {
         const res = await apiFetch(`/screenshot?monitor=${this.selectedMonitor}`);
         if (!res) return;
@@ -818,102 +782,6 @@ function app() {
       if (!res || !res.ok) return;
       this.monitors = await res.json();
       if (this.monitors.length) this.selectedMonitor = this.monitors[0].index;
-    },
-
-    async sendClick(event) {
-      this.onRemoteActivity();
-      const img = event.currentTarget;
-      const rect = img.getBoundingClientRect();
-      const x = (event.clientX - rect.left) / rect.width;
-      const y = (event.clientY - rect.top)  / rect.height;
-      const res = await apiFetch("/click", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ x, y, monitor: this.selectedMonitor }),
-      });
-      clearTimeout(this._clickFeedbackTimer);
-      this.clickFeedback = res && res.ok ? "Click sent" : "Click failed";
-      this._clickFeedbackTimer = setTimeout(() => this.clickFeedback = "", 1500);
-    },
-
-    async sendText(method = "paste") {
-      this.onRemoteActivity();
-      if (!this.remoteText) return;
-      const res = await apiFetch("/type", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: this.remoteText, method, send_enter: this.remoteTextEnter }),
-      });
-      clearTimeout(this._remoteFeedbackTimer);
-      this.remoteFeedback = res && res.ok ? "Sent" : "Failed";
-      this._remoteFeedbackTimer = setTimeout(() => this.remoteFeedback = "", 1500);
-      if (res && res.ok) { this.remoteText = ""; this.showTextPopup = false; }
-    },
-
-    async sendKey(key) {
-      this.onRemoteActivity();
-      const res = await apiFetch("/key", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key }),
-      });
-      clearTimeout(this._remoteFeedbackTimer);
-      const label = Array.isArray(key) ? key.join('+') : key;
-      this.remoteFeedback = res && res.ok ? label + " sent" : "Failed";
-      this._remoteFeedbackTimer = setTimeout(() => this.remoteFeedback = "", 1500);
-    },
-
-    setKeyCapture(on) {
-      if (on === this.keyCapture) return;
-      this.keyCapture = on;
-      if (on) {
-        this._keyCaptureHandler = (e) => this.handleKeyCapture(e);
-        document.addEventListener('keydown', this._keyCaptureHandler);
-      } else {
-        document.removeEventListener('keydown', this._keyCaptureHandler);
-        this._keyCaptureHandler = null;
-      }
-    },
-
-    handleKeyCapture(event) {
-      if (this.showTextPopup) return;
-      if (event.repeat) return;
-      const key = event.key;
-      if (['Control', 'Alt', 'Shift', 'Meta', 'CapsLock', 'NumLock', 'ScrollLock'].includes(key)) return;
-
-      event.preventDefault();
-      event.stopPropagation();
-      this.onRemoteActivity();
-
-      const KEY_MAP = {
-        'Enter': 'enter', 'Escape': 'escape', 'Tab': 'tab',
-        'Backspace': 'backspace', 'Delete': 'delete', 'Insert': 'insert',
-        'ArrowUp': 'up', 'ArrowDown': 'down', 'ArrowLeft': 'left', 'ArrowRight': 'right',
-        'Home': 'home', 'End': 'end', 'PageUp': 'pageup', 'PageDown': 'pagedown',
-        ' ': 'space',
-        'F1': 'f1', 'F2': 'f2', 'F3': 'f3', 'F4': 'f4',
-        'F5': 'f5', 'F6': 'f6', 'F7': 'f7', 'F8': 'f8',
-        'F9': 'f9', 'F10': 'f10', 'F11': 'f11', 'F12': 'f12',
-        'CapsLock': 'capslock', 'NumLock': 'numlock', 'ScrollLock': 'scrolllock',
-        'Pause': 'pause', 'PrintScreen': 'printscreen',
-      };
-
-      const mods = [];
-      if (event.ctrlKey)  mods.push('ctrl');
-      if (event.altKey)   mods.push('alt');
-      if (event.metaKey)  mods.push('super');
-
-      const mapped = KEY_MAP[key];
-      if (mapped) {
-        const keys = mods.length ? [...mods, mapped] : mapped;
-        apiFetch("/key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: keys }) });
-      } else if (key.length === 1) {
-        if (mods.length) {
-          apiFetch("/key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: [...mods, key.toLowerCase()] }) });
-        } else {
-          apiFetch("/type", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: key, method: "type", send_enter: false }) });
-        }
-      }
     },
 
     async fetchSchedulerPause() {
@@ -942,21 +810,36 @@ function app() {
       if (res && res.ok) this.schedulerPaused = next;
     },
 
-    async sendRightClick(event) {
-      event.preventDefault();
-      this.onRemoteActivity();
-      const img = event.currentTarget;
-      const rect = img.getBoundingClientRect();
-      const x = (event.clientX - rect.left) / rect.width;
-      const y = (event.clientY - rect.top)  / rect.height;
-      const res = await apiFetch("/click", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ x, y, monitor: this.selectedMonitor, button: "right" }),
-      });
-      clearTimeout(this._clickFeedbackTimer);
-      this.clickFeedback = res && res.ok ? "Right-click sent" : "Click failed";
-      this._clickFeedbackTimer = setTimeout(() => this.clickFeedback = "", 1500);
+    novncIframeUrl() {
+      const host = window.location.hostname;
+      return `/novnc-static/vnc.html?host=${host}&port=${6080}&autoconnect=true&resize=scale`;
+    },
+
+    async initNovnc() {
+      this.novncStatus = "Checking…";
+      const res = await apiFetch("/novnc/status");
+      if (!res || res.status === 403) { this.novncStatus = ""; return; }
+      const d = await res.json();
+      this.novncVncAvailable   = d.vnc_available;
+      this.novncFilesAvailable = d.files_available;
+      this.novncRunning        = d.proxy_running;
+      if (d.proxy_running)       this.novncStatus = "Running";
+      else if (!d.vnc_available) this.novncStatus = "VNC not found";
+      else if (!d.files_available) this.novncStatus = "noVNC not installed";
+      else                       this.novncStatus = "Ready";
+    },
+
+    async startNovnc() {
+      this.novncStatus = "Starting…";
+      const res = await apiFetch("/novnc/start", { method: "POST" });
+      if (res && res.ok) { this.novncRunning = true; this.novncStatus = "Running"; }
+      else this.novncStatus = "Failed to start";
+    },
+
+    async stopNovnc() {
+      await apiFetch("/novnc/stop", { method: "POST" });
+      this.novncRunning = false;
+      this.novncStatus  = "Stopped";
     },
 
     async signOut() {

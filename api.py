@@ -2,10 +2,9 @@ import asyncio
 import json
 import os
 import platform
+import socket
 import subprocess
-import threading
 from pathlib import Path
-from typing import List, Union
 
 from fastapi import Depends, FastAPI, Form, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
@@ -32,8 +31,11 @@ _LOG_PATH        = Path(__file__).parent / "logs" / "autodash.log"
 
 WEB_PORT = int(os.environ.get("WEB_PORT", 8080))
 
-_pyautogui_lock = threading.Lock()
 _scheduler_paused: bool = False
+
+_NOVNC_PATH = Path("/usr/share/novnc")
+_WEBSOCKIFY_PORT = 6080
+_novnc_process: subprocess.Popen | None = None
 
 
 def _is_raspberry_pi() -> bool:
@@ -44,24 +46,18 @@ def _is_raspberry_pi() -> bool:
         return False
 
 
-class ClickRequest(BaseModel):
-    x: float          # relative ratio 0.0–1.0
-    y: float          # relative ratio 0.0–1.0
-    monitor: int = 1  # mss monitor index (1 = first physical monitor)
-    button: str = "left"
-
-
-class TypeRequest(BaseModel):
-    text: str
-    method: str = "paste"   # "paste" = clipboard ctrl+v, "type" = key-by-key
-    send_enter: bool = False
-
-
-class KeyRequest(BaseModel):
-    key: Union[str, List[str]]
-
-
 api = FastAPI(title="autodash config")
+
+if _NOVNC_PATH.exists():
+    from fastapi.staticfiles import StaticFiles
+    api.mount("/novnc-static", StaticFiles(directory=str(_NOVNC_PATH)), name="novnc")
+
+
+@api.on_event("shutdown")
+def _on_shutdown():
+    global _novnc_process
+    if _novnc_process and _novnc_process.poll() is None:
+        _novnc_process.terminate()
 
 
 @api.get("/scheduler/pause")
@@ -286,71 +282,51 @@ async def api_monitors(_: None = Depends(require_auth)):
         ]
 
 
-@api.post("/click")
-async def api_click(req: ClickRequest, _: None = Depends(require_auth)):
-    """Simulate a mouse click at relative coordinates on the selected monitor."""
-    import mss
-    import pyautogui
-
-    def _click():
-        with _pyautogui_lock, mss.mss() as sct:
-            idx = max(1, min(req.monitor, len(sct.monitors) - 1))
-            mon = sct.monitors[idx]
-            virtual = sct.monitors[0]
-            gui_w, gui_h = pyautogui.size()
-            scale_x = gui_w / virtual["width"]
-            scale_y = gui_h / virtual["height"]
-            abs_x = (mon["left"] + req.x * mon["width"]) * scale_x
-            abs_y = (mon["top"]  + req.y * mon["height"]) * scale_y
-            pyautogui.click(abs_x, abs_y, button=req.button)
-
+def _check_vnc_port() -> bool:
     try:
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, _click)
-        return {"ok": True}
-    except Exception as exc:
-        return JSONResponse(status_code=500, content={"detail": str(exc)})
+        with socket.create_connection(("127.0.0.1", 5900), timeout=1.0):
+            return True
+    except OSError:
+        return False
 
 
-@api.post("/type")
-async def api_type(req: TypeRequest, _: None = Depends(require_auth)):
-    """Simulate keyboard input via clipboard paste for full Unicode support."""
-    import pyperclip
-    import pyautogui
+@api.get("/novnc/status")
+def api_novnc_status(_: None = Depends(require_auth)):
+    if not _is_raspberry_pi():
+        return JSONResponse(status_code=403, content={"error": "Raspberry Pi only"})
+    global _novnc_process
+    proxy_running = _novnc_process is not None and _novnc_process.poll() is None
+    return JSONResponse(content={
+        "vnc_available":   _check_vnc_port(),
+        "files_available": _NOVNC_PATH.exists(),
+        "proxy_running":   proxy_running,
+        "proxy_port":      _WEBSOCKIFY_PORT,
+    })
 
-    def _type():
-        with _pyautogui_lock:
-            if req.method == "type":
-                pyautogui.write(req.text, interval=0.02)
-            else:
-                pyperclip.copy(req.text)
-                pyautogui.hotkey("ctrl", "v")
-            if req.send_enter:
-                pyautogui.press("enter")
 
+@api.post("/novnc/start")
+def api_novnc_start(_: None = Depends(require_auth)):
+    if not _is_raspberry_pi():
+        return JSONResponse(status_code=403, content={"error": "Raspberry Pi only"})
+    global _novnc_process
+    if _novnc_process is not None and _novnc_process.poll() is None:
+        return JSONResponse(content={"port": _WEBSOCKIFY_PORT})
     try:
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, _type)
-        return {"ok": True}
+        _novnc_process = subprocess.Popen([
+            "websockify", str(_WEBSOCKIFY_PORT), "localhost:5900",
+            "--web", str(_NOVNC_PATH),
+        ])
+        return JSONResponse(content={"port": _WEBSOCKIFY_PORT})
     except Exception as exc:
-        return JSONResponse(status_code=500, content={"detail": str(exc)})
+        return JSONResponse(status_code=500, content={"error": str(exc)})
 
 
-@api.post("/key")
-async def api_key(req: KeyRequest, _: None = Depends(require_auth)):
-    """Simulate a key press or hotkey combo."""
-    import pyautogui
-
-    def _press():
-        with _pyautogui_lock:
-            if isinstance(req.key, list):
-                pyautogui.hotkey(*req.key)
-            else:
-                pyautogui.press(req.key)
-
-    try:
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, _press)
-        return {"ok": True}
-    except Exception as exc:
-        return JSONResponse(status_code=500, content={"detail": str(exc)})
+@api.post("/novnc/stop")
+def api_novnc_stop(_: None = Depends(require_auth)):
+    if not _is_raspberry_pi():
+        return JSONResponse(status_code=403, content={"error": "Raspberry Pi only"})
+    global _novnc_process
+    if _novnc_process and _novnc_process.poll() is None:
+        _novnc_process.terminate()
+    _novnc_process = None
+    return {"ok": True}
