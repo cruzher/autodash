@@ -161,22 +161,25 @@ When internet connectivity is lost all browser windows navigate to a local offli
 
 ---
 
-## Remote control
+## Screenshot
 
-The web UI includes a live remote control view accessible from the **Home** tab. It shows a continuously updated screenshot of the display and lets you interact with the machine from any browser on the network.
+The **Home** tab shows a snapshot of the display. Click the image or the **Refresh** button to take a new screenshot on demand. A monitor selector appears when more than one physical monitor is detected. The **▶ Running / ⏸ Paused** button toggles the scheduler and turns orange while paused.
 
-**Available controls:**
+This view is available on all platforms (Windows and Raspberry Pi).
 
-| Control | Description |
-|---|---|
-| Click on screenshot | Sends a mouse click at that position |
-| Keyboard (while hovering) | All key presses are forwarded to the display |
-| **Send text** button | Types or pastes a block of text, with an option to press Enter after |
-| **⊞** button | Sends the Windows (Super) key |
-| **▶ Running / ⏸ Paused** button | Toggles the scheduler — shows current state and turns orange while paused |
-| Monitor selector | Switch between physical monitors on multi-monitor setups |
+---
 
-The screenshot refresh rate adjusts automatically — faster while you are actively clicking or typing, slower when idle. Both intervals are configurable in the **Settings** page under **Remote control**.
+## Remote control (Raspberry Pi only)
+
+A full interactive remote desktop session is available from the **Remote Control** nav item, which is only shown when running on a Raspberry Pi.
+
+Clicking **Start** launches an `x11vnc` server on the Pi and a `websockify` WebSocket proxy, then embeds a [noVNC](https://novnc.com) client directly in the browser — no additional software needed on the client side. Clicking **Stop** tears both processes down.
+
+**Requirements (installed automatically by `start.py` on Raspberry Pi):**
+- `novnc` — provides the noVNC web client and `websockify`
+- `x11vnc` — standard VNC server for the X11 display (used instead of RealVNC for noVNC compatibility)
+
+> The remote session has no VNC password — access is gated by autodash's own login. Port 6080 (websockify) is open on the Pi's network interface while the session is active.
 
 ---
 
@@ -212,6 +215,10 @@ The **Settings** page in the web UI shows the current auto-login state.
 ---
 
 ## Changelog
+
+### 2026-06-02
+- **Remote control replaced with noVNC (Raspberry Pi only).** The old screenshot-polling + pyautogui input simulation is replaced by two focused features. The **Home** tab now shows a manual-refresh screenshot (click the image or the Refresh button) — available on all platforms. A new **Remote Control** nav item (Raspberry Pi only) provides a full interactive desktop session via [noVNC](https://novnc.com) embedded in the browser, backed by `x11vnc` and `websockify`. Both are installed automatically by `start.py` on Raspberry Pi. Clicking Start/Stop in the UI manages the `x11vnc` and `websockify` processes. RealVNC is not used for this feature as its proprietary authentication is incompatible with noVNC.
+- **Removed dependencies: `pyautogui`, `pyperclip`.** No longer needed now that input simulation is handled by noVNC/x11vnc. Added `websockify`.
 
 ### 2026-05-31
 - **Fix: zombie processes from CEC commands.** Each call to `_send()` in `cec.py` now calls `proc.wait()` after closing stdin, so the subprocess is reaped immediately instead of accumulating as zombies over the lifetime of the process.
