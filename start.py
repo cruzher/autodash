@@ -140,6 +140,36 @@ def ensure_cec_utils() -> None:
         print("[WARN] cec-client not found — install manually: sudo apt install cec-utils")
 
 
+def ensure_novnc() -> None:
+    if not is_raspberry_pi():
+        return
+    if pathlib.Path("/usr/share/novnc").exists():
+        return
+    if shutil.which("apt-get"):
+        print("[..] Installing novnc ...")
+        run("sudo", "apt-get", "install", "-y", "novnc", "-qq",
+            stdout=subprocess.DEVNULL)
+        print("[OK] novnc installed.")
+    else:
+        print("[WARN] novnc not found — install manually: sudo apt install novnc")
+
+
+def ensure_vnc_enabled() -> None:
+    if not is_raspberry_pi():
+        return
+    result = run("sudo", "raspi-config", "nonint", "get_vnc", check=False,
+                 capture_output=True, text=True)
+    if result.returncode == 0 and result.stdout.strip() == "0":
+        return
+    print("[..] Enabling VNC server ...")
+    result = run("sudo", "raspi-config", "nonint", "do_vnc", "0", check=False)
+    if result.returncode == 0:
+        print("[OK] VNC server enabled.")
+    else:
+        print("[WARN] Could not enable VNC automatically.")
+        print("       Run manually: sudo raspi-config → Interface Options → VNC")
+
+
 def ensure_venv() -> bool:
     activate = VENV / ("Scripts/Activate.ps1" if IS_WINDOWS else "bin/activate")
     if activate.exists():
@@ -208,6 +238,8 @@ def main() -> None:
         ensure_pi_defaults()
         ensure_xdotool()
         ensure_cec_utils()
+        ensure_novnc()
+        ensure_vnc_enabled()
     venv_created  = ensure_venv()
     deps_updated  = install_deps(venv_created)
     install_playwright(deps_updated)
