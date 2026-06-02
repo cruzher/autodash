@@ -35,7 +35,7 @@ _scheduler_paused: bool = False
 
 _NOVNC_PATH = Path("/usr/share/novnc")
 _WEBSOCKIFY_PORT = 6080
-_novnc_process: subprocess.Popen | None = None
+_novnc_process = None  # subprocess.Popen or None
 
 
 def _is_raspberry_pi() -> bool:
