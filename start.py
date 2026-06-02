@@ -157,12 +157,12 @@ def ensure_novnc() -> None:
 def ensure_vnc_enabled() -> None:
     if not is_raspberry_pi():
         return
-    result = run("sudo", "raspi-config", "nonint", "get_vnc", check=False,
+    result = run("systemctl", "is-enabled", "vncserver-x11-serviced", check=False,
                  capture_output=True, text=True)
-    if result.returncode == 0 and result.stdout.strip() == "0":
+    if result.stdout.strip() == "enabled":
         return
     print("[..] Enabling VNC server ...")
-    result = run("sudo", "raspi-config", "nonint", "do_vnc", "0", check=False)
+    result = run("sudo", "systemctl", "enable", "--now", "vncserver-x11-serviced", check=False)
     if result.returncode == 0:
         print("[OK] VNC server enabled.")
     else:
