@@ -11,9 +11,11 @@ from dataclasses import dataclass, field, fields
 class LoginStep:
     """One action in a multi-step or multi-field login sequence.
 
-    action   : "fill" | "click" | "wait_for"
-    selector : CSS selector for the target element
-    value    : text to type (fill only); {username} and {password} are substituted
+    action   : "fill" | "click" | "click_xy" | "delay" | "press" | "wait_for"
+    selector : CSS selector for the target element (ignored by click_xy and delay)
+    value    : text to type (fill only, {username}/{password}/{totp} are substituted);
+               "x, y" viewport coordinates to click (click_xy only);
+               milliseconds to wait (delay only)
     """
     action:   str
     selector: str = ""
@@ -125,10 +127,13 @@ def load_sites_json(path) -> list:
     """Load SITES from a JSON file and return list[SiteConfig]."""
     data = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
     sites = []
+    step_fields = {f.name for f in fields(LoginStep)}
     for s in data:
         s = dict(s)
-        steps = [LoginStep(**step) for step in s.pop("login_steps", [])]
-        post_login_steps = [LoginStep(**step) for step in s.pop("post_login_steps", [])]
+        steps = [LoginStep(**{k: v for k, v in step.items() if k in step_fields})
+                 for step in s.pop("login_steps", [])]
+        post_login_steps = [LoginStep(**{k: v for k, v in step.items() if k in step_fields})
+                             for step in s.pop("post_login_steps", [])]
         # schedule entries are stored as lists in JSON; convert back to tuples
         schedule = [tuple(entry) for entry in s.pop("schedule", [])]
         known = {f.name for f in fields(SiteConfig)}

@@ -35,6 +35,10 @@ WEB_PORT = int(os.environ.get("WEB_PORT", 8080))
 
 _scheduler_paused: bool = False
 
+# Populated by monitor.py with the live list of SiteMonitor instances (same
+# list object it mutates), so endpoints here can look up a running site's page.
+monitors: list = []
+
 _NOVNC_PATH = Path("/usr/share/novnc")
 _WEBSOCKIFY_PORT = 6080
 _X11VNC_PORT = 5901
@@ -271,6 +275,46 @@ async def api_screenshot(monitor: int = 1, _: None = Depends(require_auth)):
         return Response(content=png, media_type="image/png")
     except Exception as exc:
         return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+
+@api.get("/sites/{name}/page-screenshot")
+async def api_site_page_screenshot(name: str, _: None = Depends(require_auth)):
+    """Return a PNG screenshot of the given site's live page.
+
+    Unlike /screenshot (a physical-display grab), this is taken directly from
+    the site's Playwright page, so pixel coordinates match click_xy exactly -
+    no window position or OS display-scaling correction needed.
+    """
+    m = next((m for m in monitors if m.cfg.name == name), None)
+    if m is None or m.page is None:
+        return JSONResponse(status_code=404, content={"detail": "Site is not currently running"})
+    try:
+        png = await m.page.screenshot()
+        return Response(content=png, media_type="image/png")
+    except Exception as exc:
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+
+@api.post("/sites/{name}/page-click")
+async def api_site_page_click(name: str, request: Request, _: None = Depends(require_auth)):
+    """Perform a real mouse.click(x, y) on the given site's live page.
+
+    Used by the click_xy coordinate picker when the user opts to also apply
+    the click (e.g. to advance a multi-step sequence to its next state).
+    """
+    body = await request.json()
+    try:
+        x, y = float(body["x"]), float(body["y"])
+    except (KeyError, TypeError, ValueError):
+        return JSONResponse(status_code=400, content={"detail": "x and y are required numbers"})
+    m = next((m for m in monitors if m.cfg.name == name), None)
+    if m is None or m.page is None:
+        return JSONResponse(status_code=404, content={"detail": "Site is not currently running"})
+    try:
+        await m.page.mouse.click(x, y)
+    except Exception as exc:
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
+    return {"ok": True}
 
 
 @api.get("/monitors")

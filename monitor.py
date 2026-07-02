@@ -298,6 +298,7 @@ async def main():
             SiteMonitor(cfg, pw, profile_dirs[i])
             for i, cfg in enumerate(initial_sites)
         ]
+        _api_mod.monitors = monitors
         coordinator = asyncio.create_task(
             schedule_coordinator(monitors, pw), name="coordinator"
         )

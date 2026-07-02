@@ -363,9 +363,30 @@ class SiteMonitor:
                     await loc.wait_for(state="visible", timeout=step_timeout)
                     await loc.click()
                     await asyncio.sleep(1)
+                    self.log.info("%s: clicked %s", label, step.selector)
                 except PlaywrightTimeoutError:
                     self.log.error("%s: element not found: %s", label, step.selector)
                     return
+
+            elif step.action == "click_xy":
+                try:
+                    x_str, y_str = value.split(",")
+                    x, y = float(x_str.strip()), float(y_str.strip())
+                except ValueError:
+                    self.log.error("%s: invalid 'x, y' value: %r", label, step.value)
+                    return
+                await self.page.mouse.click(x, y)
+                await asyncio.sleep(1)
+                self.log.info("%s: clicked at (%g, %g)", label, x, y)
+
+            elif step.action == "delay":
+                try:
+                    ms = float(value)
+                except ValueError:
+                    self.log.error("%s: invalid delay value (expected milliseconds): %r", label, step.value)
+                    return
+                await asyncio.sleep(ms / 1000)
+                self.log.info("%s: delayed %g ms", label, ms)
 
             elif step.action == "press":
                 if step.selector:

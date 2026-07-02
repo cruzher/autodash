@@ -69,9 +69,9 @@ Open the web UI, expand a site, and scroll to the **Multi-step login** section (
 
 | Field | Description |
 |---|---|
-| Action | What to do: `fill`, `click`, `wait_for`, or `press` |
-| CSS selector | The element to target (optional for `press`) |
-| Value | Text to type (`fill`), key name (`press`), or empty (`click` / `wait_for`) |
+| Action | What to do: `fill`, `click`, `click_xy`, `delay`, `wait_for`, or `press` |
+| CSS selector | The element to target (ignored by `click_xy` and `delay`) |
+| Value | Text to type (`fill`), `x, y` position (`click_xy`), milliseconds (`delay`), key name (`press`), or empty (`click` / `wait_for`) |
 
 Use `{username}` and `{password}` as placeholders in the **Value** field — they are substituted with the credentials stored for that site.
 
@@ -90,6 +90,8 @@ The `role=` format maps directly to what Playwright's codegen produces — copy 
 |---|---|
 | `fill` | Clicks the element then types the given value into it |
 | `click` | Clicks the element and waits 1 second |
+| `click_xy` | Clicks a fixed `x, y` viewport position (value field) and waits 1 second — for content with no reliable selector. Use the ⌖ Find button next to the step to pick coordinates from a live screenshot of the page |
+| `delay` | Pauses for the given number of milliseconds (value field) |
 | `wait_for` | Pauses until the element appears in the DOM (timeout: 15 s) |
 | `press` | Presses a keyboard key on the element (or the whole page if no selector) |
 
@@ -215,6 +217,12 @@ The **Settings** page in the web UI shows the current auto-login state.
 ---
 
 ## Changelog
+
+### 2026-07-02
+- **New login-step actions: `click_xy` and `delay`.** `click_xy` clicks a fixed `x, y` viewport position instead of a CSS selector — useful for canvas/iframe content with no reliable selector. `delay` pauses for a given number of milliseconds. Both are available in **Multi-step login** and **Post-login steps**.
+- **Coordinate picker for `click_xy` steps.** A **⌖ Find** button next to each `click_xy` step opens a screenshot taken directly from that site's live page (pixel-exact match for `click_xy`'s coordinate space — no window position or display-scaling correction needed). Clicking the image saves the coordinate into the step, then asks whether to also perform that click on the live page now, so you can advance a multi-step sequence to its next visible state while picking coordinates for it. Requires the site to currently be running.
+- **Home screenshot now reports the clicked pixel position.** Clicking the display screenshot on the **Home** tab shows the pixel coordinate under the cursor (with a copy button) instead of just refreshing. Note this is a physical-monitor coordinate, not viewport-relative — it only lines up directly with `click_xy` when a site's window sits at `(0, 0)` and OS display scaling is 100%.
+- **Fix: unknown fields in a saved login/post-login step no longer crash startup.** `load_sites_json` now filters each step to known `LoginStep` fields before construction, the same way site-level config already does.
 
 ### 2026-06-02
 - **Remote control replaced with noVNC (Raspberry Pi only).** The old screenshot-polling + pyautogui input simulation is replaced by two focused features. The **Home** tab now shows a manual-refresh screenshot (click the image or the Refresh button) — available on all platforms. A new **Remote Control** nav item (Raspberry Pi only) provides a full interactive desktop session via [noVNC](https://novnc.com) embedded in the browser, backed by `x11vnc` and `websockify`. Both are installed automatically by `start.py` on Raspberry Pi. Clicking Start/Stop in the UI manages the `x11vnc` and `websockify` processes. RealVNC is not used for this feature as its proprietary authentication is incompatible with noVNC.

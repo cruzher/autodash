@@ -222,6 +222,15 @@
             </div>
             <!-- Right: updated timestamp + refresh + live status -->
             <div style="display:flex;align-items:center;gap:8px;">
+              <template x-if="screenshotClickPos">
+                <span style="font-size:12px;color:#9ca3af;display:flex;align-items:center;gap:4px;"
+                      title="Monitor pixel position — for a click_xy step, subtract that site's window X/Y offset if its window isn't at (0,0)">
+                  Clicked:
+                  <span x-text="screenshotClickPos.x + ', ' + screenshotClickPos.y"
+                        style="color:#111827;font-family:monospace;"></span>
+                  <button class="icon-btn" @click="copyClickPos()" title="Copy as x, y">&#128203;</button>
+                </span>
+              </template>
               <span x-show="screenshotUpdated" x-text="screenshotUpdated"
                     style="font-size:12px;color:#9ca3af;"></span>
               <button class="btn-secondary"
@@ -238,9 +247,10 @@
             : 'background:#111827;border-radius:0 0 8px 8px;overflow:auto;line-height:0;'">
             <template x-if="screenshotSrc">
               <img :src="screenshotSrc"
-                   :style="displayFitMode ? 'max-width:100%;max-height:calc(100vh - 160px);width:auto;height:auto;display:block;cursor:pointer;' : 'display:block;cursor:pointer;'"
+                   :style="displayFitMode ? 'max-width:100%;max-height:calc(100vh - 160px);width:auto;height:auto;display:block;cursor:crosshair;' : 'display:block;cursor:crosshair;'"
                    alt="Display screenshot"
-                   @click="fetchScreenshot()"
+                   title="Click to read the pixel position under the cursor"
+                   @click="pickCoordinates($event)"
                    @contextmenu.prevent>
             </template>
             <template x-if="!screenshotSrc && screenshotError">
@@ -342,10 +352,15 @@
                       <select x-model="step.action">
                         <option value="fill">fill</option>
                         <option value="click">click</option>
+                        <option value="click_xy">click_xy</option>
+                        <option value="delay">delay</option>
                         <option value="wait_for">wait_for</option>
                         <option value="press">press</option>
                       </select>
-                      <input x-model="step.selector" placeholder="CSS selector (optional for press)">
+                      <input x-show="!['click_xy','delay'].includes(step.action)" x-model="step.selector" placeholder="CSS selector (optional for press)">
+                      <input x-show="step.action === 'click_xy'" x-model="step.value" placeholder="x, y (e.g. 320, 480)">
+                      <button x-show="step.action === 'click_xy'" class="icon-btn" @click="openCoordPicker(site.name, step)" title="Find coordinates on the live page">&#8982; Find</button>
+                      <input x-show="step.action === 'delay'" type="number" min="0" x-model="step.value" placeholder="milliseconds (e.g. 1500)">
                       <template x-if="step.action === 'fill'">
                         <div style="display:contents">
                           <select :value="['{username}','{password}','{totp}'].includes(step.value) ? step.value : 'custom'" @change="step.value = $event.target.value === 'custom' ? '' : $event.target.value">
@@ -384,10 +399,15 @@
                       <select x-model="step.action">
                         <option value="fill">fill</option>
                         <option value="click">click</option>
+                        <option value="click_xy">click_xy</option>
+                        <option value="delay">delay</option>
                         <option value="wait_for">wait_for</option>
                         <option value="press">press</option>
                       </select>
-                      <input x-model="step.selector" placeholder="CSS selector (optional for press)">
+                      <input x-show="!['click_xy','delay'].includes(step.action)" x-model="step.selector" placeholder="CSS selector (optional for press)">
+                      <input x-show="step.action === 'click_xy'" x-model="step.value" placeholder="x, y (e.g. 320, 480)">
+                      <button x-show="step.action === 'click_xy'" class="icon-btn" @click="openCoordPicker(site.name, step)" title="Find coordinates on the live page">&#8982; Find</button>
+                      <input x-show="step.action === 'delay'" type="number" min="0" x-model="step.value" placeholder="milliseconds (e.g. 1500)">
                       <template x-if="step.action === 'fill'">
                         <div style="display:contents">
                           <select :value="['{username}','{password}','{totp}'].includes(step.value) ? step.value : 'custom'" @change="step.value = $event.target.value === 'custom' ? '' : $event.target.value">
@@ -641,6 +661,31 @@ python autologin.py status</pre>
     </div>
   </template>
 
+  <!-- Coordinate picker modal (for click_xy steps) -->
+  <template x-if="coordPickerOpen">
+    <div class="modal-overlay" @click.self="closeCoordPicker()">
+      <div style="background:#111827;border-radius:8px;padding:14px;max-width:90vw;max-height:90vh;display:flex;flex-direction:column;gap:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:20px;">
+          <span style="color:#f9fafb;font-size:13px;font-weight:600;">Click the target position on the live page</span>
+          <button class="icon-btn" style="color:#9ca3af;" @click="closeCoordPicker()" title="Close">&#10005;</button>
+        </div>
+        <template x-if="coordPickerSrc">
+          <img :src="coordPickerSrc"
+               style="max-width:100%;max-height:75vh;display:block;cursor:crosshair;border-radius:4px;"
+               alt="Live page screenshot"
+               @click="pickStepCoordinates($event)"
+               @contextmenu.prevent>
+        </template>
+        <template x-if="!coordPickerSrc && coordPickerError">
+          <div style="padding:30px 50px;text-align:center;color:#f87171;font-size:13px;" x-text="coordPickerError"></div>
+        </template>
+        <template x-if="!coordPickerSrc && !coordPickerError">
+          <div style="padding:30px 50px;text-align:center;color:#9ca3af;font-size:13px;">Loading page screenshot...</div>
+        </template>
+      </div>
+    </div>
+  </template>
+
 </div>
 
 <script>
@@ -714,6 +759,12 @@ function app() {
     screenshotSrc: null,
     screenshotError: null,
     screenshotUpdated: "",
+    screenshotClickPos: null,
+    coordPickerOpen: false,
+    coordPickerSrc: null,
+    coordPickerError: null,
+    coordPickerStep: null,
+    coordPickerSite: null,
     monitors: [],
     selectedMonitor: 1,
     schedulerPaused: false,
@@ -772,9 +823,81 @@ function app() {
         this.screenshotSrc = URL.createObjectURL(blob);
         this.screenshotError = null;
         this.screenshotUpdated = "Updated " + new Date().toLocaleTimeString();
+        this.screenshotClickPos = null;
       } catch(e) {
         this.screenshotError = e.message;
       }
+    },
+
+    pickCoordinates(e) {
+      const img = e.target;
+      const rect = img.getBoundingClientRect();
+      const x = Math.round((e.clientX - rect.left) * (img.naturalWidth / rect.width));
+      const y = Math.round((e.clientY - rect.top) * (img.naturalHeight / rect.height));
+      this.screenshotClickPos = { x, y };
+    },
+
+    copyClickPos() {
+      if (!this.screenshotClickPos) return;
+      const { x, y } = this.screenshotClickPos;
+      navigator.clipboard?.writeText(`${x}, ${y}`);
+    },
+
+    async openCoordPicker(siteName, step) {
+      if (!siteName) { alert("Save the site first so autodash knows which running page to capture."); return; }
+      this.coordPickerSite  = siteName;
+      this.coordPickerStep  = step;
+      this.coordPickerSrc   = null;
+      this.coordPickerError = null;
+      this.coordPickerOpen  = true;
+      try {
+        const res = await apiFetch(`/sites/${encodeURIComponent(siteName)}/page-screenshot`);
+        if (!res) return;
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          this.coordPickerError = body.detail || "Failed to capture page";
+          return;
+        }
+        const blob = await res.blob();
+        this.coordPickerSrc = URL.createObjectURL(blob);
+      } catch(e) {
+        this.coordPickerError = e.message;
+      }
+    },
+
+    async pickStepCoordinates(e) {
+      const img = e.target;
+      const rect = img.getBoundingClientRect();
+      const x = Math.round((e.clientX - rect.left) * (img.naturalWidth / rect.width));
+      const y = Math.round((e.clientY - rect.top) * (img.naturalHeight / rect.height));
+      if (this.coordPickerStep) this.coordPickerStep.value = `${x}, ${y}`;
+      const siteName = this.coordPickerSite;
+
+      if (confirm(`Coordinate (${x}, ${y}) saved.\n\nAlso click that position on the live page now? Use this to advance a multi-step sequence to its next state.`)) {
+        try {
+          const res = await apiFetch(`/sites/${encodeURIComponent(siteName)}/page-click`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ x, y }),
+          });
+          if (res && !res.ok) {
+            const body = await res.json().catch(() => ({}));
+            alert("Click failed: " + (body.detail || res.statusText));
+          }
+        } catch(e) {
+          alert("Click failed: " + e.message);
+        }
+      }
+      this.closeCoordPicker();
+    },
+
+    closeCoordPicker() {
+      this.coordPickerOpen  = false;
+      if (this.coordPickerSrc) URL.revokeObjectURL(this.coordPickerSrc);
+      this.coordPickerSrc   = null;
+      this.coordPickerStep  = null;
+      this.coordPickerSite  = null;
+      this.coordPickerError = null;
     },
 
     async fetchMonitors() {
