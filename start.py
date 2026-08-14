@@ -24,6 +24,12 @@ CHROMIUM_CACHE = (
     pathlib.Path.home() / ".cache/ms-playwright"
 )
 
+OPENBOX_NS  = "http://openbox.org/3.4/rc"
+OPENBOX_DIR = pathlib.Path.home() / ".config" / "openbox"
+RC_FILE     = OPENBOX_DIR / "rpd-rc.xml"
+RC_SYS      = pathlib.Path("/etc/xdg/openbox/rpd-rc.xml")
+RC_ASSET    = DIR / "assets" / "rpd-rc.xml"
+
 
 def banner(msg: str) -> None:
     print()
@@ -168,6 +174,113 @@ def ensure_x11vnc() -> None:
         print("[WARN] x11vnc not found — install manually: sudo apt install x11vnc")
 
 
+def ensure_xmlstarlet() -> None:
+    if shutil.which("xmlstarlet"):
+        return
+    if shutil.which("apt-get"):
+        print("[..] Installing xmlstarlet ...")
+        run("sudo", "apt-get", "install", "-y", "xmlstarlet", "-qq",
+            stdout=subprocess.DEVNULL)
+        print("[OK] xmlstarlet installed.")
+    else:
+        print("[WARN] xmlstarlet not found — install manually: sudo apt install xmlstarlet")
+
+
+def ensure_openbox_config() -> None:
+    """On Raspberry Pi: seed ~/.config/openbox/rpd-rc.xml if missing."""
+    if not is_raspberry_pi():
+        return
+    if RC_FILE.exists():
+        return
+    OPENBOX_DIR.mkdir(parents=True, exist_ok=True)
+    if RC_SYS.exists():
+        shutil.copyfile(RC_SYS, RC_FILE)
+        print(f"[OK] Seeded {RC_FILE} from {RC_SYS}.")
+    elif RC_ASSET.exists():
+        shutil.copyfile(RC_ASSET, RC_FILE)
+        print(f"[WARN] {RC_SYS} not found — seeded {RC_FILE} from bundled fallback "
+              f"({RC_ASSET.relative_to(DIR)}); some stock openbox settings may be missing.")
+    else:
+        print(f"[WARN] No openbox rc.xml source found ({RC_SYS} or "
+              f"{RC_ASSET.relative_to(DIR)}) — cannot seed openbox config.")
+
+
+def _xmlstarlet_count(xpath: str) -> int:
+    result = run("xmlstarlet", "sel", "-N", f"ob={OPENBOX_NS}",
+                 "-t", "-v", f"count({xpath})",
+                 str(RC_FILE), capture_output=True, text=True)
+    return int(result.stdout.strip() or "0")
+
+
+def _xmlstarlet_edit(*ed_args: str) -> None:
+    result = run("xmlstarlet", "ed", "-P", "-N", f"ob={OPENBOX_NS}", *ed_args,
+                 str(RC_FILE), capture_output=True, text=True)
+    if not result.stdout.strip():
+        raise RuntimeError("xmlstarlet produced empty output")
+    tmp = RC_FILE.with_suffix(RC_FILE.suffix + ".tmp")
+    tmp.write_text(result.stdout, encoding="utf-8")
+    tmp.replace(RC_FILE)
+
+
+def reload_openbox() -> None:
+    if not shutil.which("openbox"):
+        return
+    env = dict(os.environ, DISPLAY=os.environ.get("DISPLAY", ":0"))
+    result = run("openbox", "--reconfigure", "--config-file", str(RC_FILE),
+                 env=env, check=False,
+                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if result.returncode == 0:
+        print("[OK] openbox reconfigured.")
+    else:
+        print("[WARN] openbox --reconfigure failed (openbox may not be running yet) — "
+              "the change will take effect next time openbox starts.")
+
+
+def ensure_openbox_no_decor() -> None:
+    """On Raspberry Pi: disable window decorations globally in openbox."""
+    if not is_raspberry_pi():
+        return
+    if not RC_FILE.exists():
+        return
+    if not shutil.which("xmlstarlet"):
+        print("[WARN] xmlstarlet not found — cannot disable window decorations; "
+              "install manually: sudo apt install xmlstarlet")
+        return
+
+    try:
+        if _xmlstarlet_count(
+            "/ob:openbox_config/ob:applications/"
+            "ob:application[@name='*'][@class='*'][ob:decor='no']"
+        ) > 0:
+            return
+
+        apps_exist = _xmlstarlet_count("/ob:openbox_config/ob:applications") > 0
+
+        print("[..] Disabling window decorations in openbox ...")
+        if apps_exist:
+            apps_xpath = "/ob:openbox_config/ob:applications"
+            ed_args = []
+        else:
+            apps_xpath = "/ob:openbox_config/ob:applications[last()]"
+            ed_args = ["-s", "/ob:openbox_config",
+                       "-t", "elem", "-n", "ob:applications", "-v", ""]
+
+        ed_args += ["-s", apps_xpath, "-t", "elem", "-n", "ob:application", "-v", ""]
+        app_xpath = f"{apps_xpath}/ob:application[last()]"
+        ed_args += [
+            "-s", app_xpath, "-t", "attr", "-n", "name",  "-v", "*",
+            "-s", app_xpath, "-t", "attr", "-n", "class", "-v", "*",
+            "-s", app_xpath, "-t", "elem", "-n", "ob:decor", "-v", "no",
+        ]
+        _xmlstarlet_edit(*ed_args)
+        print("[OK] Window decorations disabled.")
+    except (subprocess.CalledProcessError, OSError, RuntimeError) as exc:
+        print(f"[WARN] Could not patch {RC_FILE}: {exc}")
+        return
+
+    reload_openbox()
+
+
 def ensure_venv() -> bool:
     activate = VENV / ("Scripts/Activate.ps1" if IS_WINDOWS else "bin/activate")
     if activate.exists():
@@ -238,6 +351,9 @@ def main() -> None:
         ensure_cec_utils()
         ensure_novnc()
         ensure_x11vnc()
+        ensure_xmlstarlet()
+        ensure_openbox_config()
+        ensure_openbox_no_decor()
     venv_created  = ensure_venv()
     deps_updated  = install_deps(venv_created)
     install_playwright(deps_updated)

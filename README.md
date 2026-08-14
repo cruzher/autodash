@@ -185,6 +185,17 @@ Clicking **Start** launches an `x11vnc` server on the Pi and a `websockify` WebS
 
 ---
 
+## Borderless kiosk windows (Raspberry Pi only)
+
+On Raspberry Pi OS, `start.py` disables window decorations (titlebar, min/max/close buttons) globally in openbox, so the Chromium dashboard windows are fully borderless even on a freshly imaged Pi.
+
+It seeds `~/.config/openbox/rpd-rc.xml` from the OS default (`/etc/xdg/openbox/rpd-rc.xml`) if it doesn't exist yet, then adds a `<decor>no</decor>` rule to it using `xmlstarlet` and reloads openbox (`openbox --reconfigure`) to apply the change immediately, without a reboot.
+
+**Requirements (installed automatically by `start.py` on Raspberry Pi):**
+- `xmlstarlet` — used to edit `rpd-rc.xml` safely instead of raw text manipulation
+
+---
+
 ## Windows auto-login
 
 autodash includes a CLI tool to configure Windows to log in automatically on boot — useful for unattended kiosk machines that need to start without a password prompt.
@@ -217,6 +228,9 @@ The **Settings** page in the web UI shows the current auto-login state.
 ---
 
 ## Changelog
+
+### 2026-08-14
+- **Borderless kiosk windows on Raspberry Pi.** `start.py` now disables openbox window decorations globally, so a fresh Pi image no longer shows a titlebar on the kiosk Chromium window. It seeds `~/.config/openbox/rpd-rc.xml` from `/etc/xdg/openbox/rpd-rc.xml` (or a bundled fallback at `assets/rpd-rc.xml` if that's missing) and idempotently injects a `<decor>no</decor>` rule via `xmlstarlet`, then reloads openbox to apply it without a reboot. `xmlstarlet` is installed automatically.
 
 ### 2026-07-02
 - **New login-step actions: `click_xy` and `delay`.** `click_xy` clicks a fixed `x, y` viewport position instead of a CSS selector — useful for canvas/iframe content with no reliable selector. `delay` pauses for a given number of milliseconds. Both are available in **Multi-step login** and **Post-login steps**.
