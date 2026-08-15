@@ -229,10 +229,6 @@ The **Settings** page in the web UI shows the current auto-login state.
 
 ## Changelog
 
-### 2026-08-15
-- **Autostart on Raspberry Pi now runs as a systemd `--user` service instead of a visible `lxterminal` window.** `start.py` is launched by `~/.config/systemd/user/autodash.service` (supervised with `Restart=on-failure`, logs via `journalctl --user -u autodash`) rather than an `@lxterminal -e python3 start.py` line in the lxsession autostart file. It still runs inside the pi user's regular desktop-autologin session — nothing about the login flow changes, and remote control / window positioning still work the same since they attach to that same X11 session. `DISPLAY` and `XAUTHORITY` are set explicitly on the unit rather than relied on. Toggling **Autostart** in Settings only takes effect on the next login, same as before.
-- **Kiosk wallpaper and hidden desktop icons on Raspberry Pi.** `start.py` now sets `~/.config/pcmanfm/*/desktop-items-0.conf` to use a bundled dark wallpaper (`assets/wallpaper.png`) and hides desktop icons by pointing pcmanfm's desktop folder at an empty directory and disabling the home/trash/mounts icons, instead of relying on pcmanfm's own icon-visibility settings (which don't cover files a user later drops on the real Desktop folder).
-
 ### 2026-08-14
 - **Borderless kiosk windows on Raspberry Pi.** `start.py` now disables openbox window decorations globally, so a fresh Pi image no longer shows a titlebar on the kiosk Chromium window. It seeds `~/.config/openbox/rpd-rc.xml` from `/etc/xdg/openbox/rpd-rc.xml` (or a bundled fallback at `assets/rpd-rc.xml` if that's missing) and idempotently injects a `<decor>no</decor>` rule via `xmlstarlet`, then reloads openbox to apply it without a reboot. `xmlstarlet` is installed automatically.
 
