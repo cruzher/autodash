@@ -119,6 +119,28 @@ def find_window_id(title):
     return None
 
 
+def get_screen_size():
+    if not HAS_XDOTOOL:
+        return None
+    r = run_cmd(["xdotool", "getdisplaygeometry"])
+    if r.returncode != 0:
+        return None
+    try:
+        width, height = r.stdout.split()
+        return int(width), int(height)
+    except ValueError:
+        return None
+
+
+def find_window_by_class(cls):
+    if not HAS_XDOTOOL:
+        return None
+    r = run_cmd(["xdotool", "search", "--class", cls])
+    if r.returncode == 0 and r.stdout.strip():
+        return r.stdout.strip().splitlines()[-1]
+    return None
+
+
 def get_window_geometry(wid):
     if not HAS_XDOTOOL:
         return None

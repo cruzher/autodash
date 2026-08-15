@@ -7,6 +7,7 @@ import pathlib
 import shutil
 import subprocess
 import sys
+import time
 
 IS_WINDOWS = sys.platform == "win32"
 DIR        = pathlib.Path(__file__).parent
@@ -28,6 +29,8 @@ OPENBOX_DIR = pathlib.Path.home() / ".config" / "openbox"
 RC_FILE     = OPENBOX_DIR / "rpd-rc.xml"
 RC_SYS      = pathlib.Path("/etc/xdg/openbox/rpd-rc.xml")
 RC_ASSET    = DIR / "assets" / "rpd-rc.xml"
+
+TERMINAL_HEIGHT = 200  # px — height of the console strip pinned to the bottom of the screen
 
 
 def banner(msg: str) -> None:
@@ -95,6 +98,37 @@ def fix_wayland() -> None:
     input(" Press Enter to reboot now, or Ctrl+C to reboot later ...")
     run("sudo", "reboot", check=False)
     sys.exit(0)
+
+
+def ensure_terminal_position() -> None:
+    """On Raspberry Pi: pin this lxterminal window to a strip along the bottom of the screen.
+
+    Uses the same xdotool-based tools display.py uses to position the kiosk's
+    Chromium windows, rather than a separate mechanism.
+    """
+    if not is_raspberry_pi():
+        return
+    import display
+    if not display.HAS_XDOTOOL:
+        return
+
+    wid  = None
+    size = None
+    for _ in range(10):
+        wid  = wid  or display.find_window_by_class("lxterminal")
+        size = size or display.get_screen_size()
+        if wid and size:
+            break
+        time.sleep(0.3)
+    if not wid or not size:
+        print("[WARN] Could not locate lxterminal window — skipping repositioning.")
+        return
+
+    width, height = size
+    x, y = 0, height - TERMINAL_HEIGHT
+    display.run_cmd(["xdotool", "windowmove", "--sync", wid, str(x), str(y)])
+    display.run_cmd(["xdotool", "windowsize", "--sync", wid, str(width), str(TERMINAL_HEIGHT)])
+    print(f"[OK] Terminal window pinned to bottom strip ({width}x{TERMINAL_HEIGHT}).")
 
 
 def ensure_pi_defaults() -> None:
@@ -422,6 +456,7 @@ def main() -> None:
     else:
         ensure_pi_defaults()
         ensure_xdotool()
+        ensure_terminal_position()
         ensure_cec_utils()
         ensure_novnc()
         ensure_x11vnc()
