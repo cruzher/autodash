@@ -30,7 +30,9 @@ RC_FILE     = OPENBOX_DIR / "rpd-rc.xml"
 RC_SYS      = pathlib.Path("/etc/xdg/openbox/rpd-rc.xml")
 RC_ASSET    = DIR / "assets" / "rpd-rc.xml"
 
-TERMINAL_HEIGHT = 200  # px — height of the console strip pinned to the bottom of the screen
+TERMINAL_HEIGHT       = 200  # px — height of the console strip
+TERMINAL_TOP_OFFSET   = 30   # px — shifted above the top edge to hide lxterminal's menu bar
+TERMINAL_WIDTH_EXTRA  = 10   # px — extra width hanging off the right edge to hide the scrollbar
 
 
 def banner(msg: str) -> None:
@@ -101,10 +103,12 @@ def fix_wayland() -> None:
 
 
 def ensure_terminal_position() -> None:
-    """On Raspberry Pi: pin this lxterminal window to a strip along the bottom of the screen.
+    """On Raspberry Pi: pin this lxterminal window to a strip along the top of the screen.
 
     Uses the same xdotool-based tools display.py uses to position the kiosk's
-    Chromium windows, rather than a separate mechanism.
+    Chromium windows, rather than a separate mechanism. The window is shifted
+    above the top edge to crop off lxterminal's menu bar, and made wider than
+    the screen to push its scrollbar past the right edge.
     """
     if not is_raspberry_pi():
         return
@@ -124,11 +128,12 @@ def ensure_terminal_position() -> None:
         print("[WARN] Could not locate lxterminal window — skipping repositioning.")
         return
 
-    width, height = size
-    x, y = 0, height - TERMINAL_HEIGHT
+    screen_width, _screen_height = size
+    x, y     = 0, -TERMINAL_TOP_OFFSET
+    width    = screen_width + TERMINAL_WIDTH_EXTRA
     display.run_cmd(["xdotool", "windowmove", "--sync", wid, str(x), str(y)])
     display.run_cmd(["xdotool", "windowsize", "--sync", wid, str(width), str(TERMINAL_HEIGHT)])
-    print(f"[OK] Terminal window pinned to bottom strip ({width}x{TERMINAL_HEIGHT}).")
+    print(f"[OK] Terminal window pinned to top strip ({width}x{TERMINAL_HEIGHT} at {x},{y}).")
 
 
 def ensure_pi_defaults() -> None:
