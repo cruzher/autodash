@@ -24,7 +24,6 @@ CHROMIUM_CACHE = (
     pathlib.Path.home() / ".cache/ms-playwright"
 )
 
-OPENBOX_NS  = "http://openbox.org/3.4/rc"
 OPENBOX_DIR = pathlib.Path.home() / ".config" / "openbox"
 RC_FILE     = OPENBOX_DIR / "rpd-rc.xml"
 RC_SYS      = pathlib.Path("/etc/xdg/openbox/rpd-rc.xml")
@@ -205,15 +204,30 @@ def ensure_openbox_config() -> None:
               f"{RC_ASSET.relative_to(DIR)}) — cannot seed openbox config.")
 
 
+# rpd-rc.xml declares a default xmlns, which xmlstarlet can only match via a
+# bound "-N" prefix — but that same prefix can't be used to *create* elements
+# (xmlstarlet has no way to assign a new node to a namespace via "-n"; it
+# creates a literal, unnamespaced node named e.g. "ob:application" instead,
+# which then fails to match any later "ob:"-bound XPath). Sidestepping the
+# whole issue with local-name() lets every query/insert use the same,
+# consistently-matching XPath regardless of namespace.
+_OB_ROOT = "/*[local-name()='openbox_config']"
+_OB_APPS = f"{_OB_ROOT}/*[local-name()='applications']"
+_OB_NO_DECOR_RULE = (
+    f"{_OB_APPS}/*[local-name()='application']"
+    "[@name='*'][@class='*']"
+    "[*[local-name()='decor']='no']"
+)
+
+
 def _xmlstarlet_count(xpath: str) -> int:
-    result = run("xmlstarlet", "sel", "-N", f"ob={OPENBOX_NS}",
-                 "-t", "-v", f"count({xpath})",
+    result = run("xmlstarlet", "sel", "-t", "-v", f"count({xpath})",
                  str(RC_FILE), capture_output=True, text=True)
     return int(result.stdout.strip() or "0")
 
 
 def _xmlstarlet_edit(*ed_args: str) -> None:
-    result = run("xmlstarlet", "ed", "-P", "-N", f"ob={OPENBOX_NS}", *ed_args,
+    result = run("xmlstarlet", "ed", "-P", *ed_args,
                  str(RC_FILE), capture_output=True, text=True)
     if not result.stdout.strip():
         raise RuntimeError("xmlstarlet produced empty output")
@@ -248,29 +262,25 @@ def ensure_openbox_no_decor() -> None:
         return
 
     try:
-        if _xmlstarlet_count(
-            "/ob:openbox_config/ob:applications/"
-            "ob:application[@name='*'][@class='*'][ob:decor='no']"
-        ) > 0:
+        if _xmlstarlet_count(_OB_NO_DECOR_RULE) > 0:
             return
 
-        apps_exist = _xmlstarlet_count("/ob:openbox_config/ob:applications") > 0
+        apps_exist = _xmlstarlet_count(_OB_APPS) > 0
 
         print("[..] Disabling window decorations in openbox ...")
         if apps_exist:
-            apps_xpath = "/ob:openbox_config/ob:applications"
+            apps_xpath = _OB_APPS
             ed_args = []
         else:
-            apps_xpath = "/ob:openbox_config/ob:applications[last()]"
-            ed_args = ["-s", "/ob:openbox_config",
-                       "-t", "elem", "-n", "ob:applications", "-v", ""]
+            apps_xpath = f"{_OB_APPS}[last()]"
+            ed_args = ["-s", _OB_ROOT, "-t", "elem", "-n", "applications", "-v", ""]
 
-        ed_args += ["-s", apps_xpath, "-t", "elem", "-n", "ob:application", "-v", ""]
-        app_xpath = f"{apps_xpath}/ob:application[last()]"
+        ed_args += ["-s", apps_xpath, "-t", "elem", "-n", "application", "-v", ""]
+        app_xpath = f"{apps_xpath}/*[local-name()='application'][last()]"
         ed_args += [
             "-s", app_xpath, "-t", "attr", "-n", "name",  "-v", "*",
             "-s", app_xpath, "-t", "attr", "-n", "class", "-v", "*",
-            "-s", app_xpath, "-t", "elem", "-n", "ob:decor", "-v", "no",
+            "-s", app_xpath, "-t", "elem", "-n", "decor", "-v", "no",
         ]
         _xmlstarlet_edit(*ed_args)
         print("[OK] Window decorations disabled.")
