@@ -173,6 +173,70 @@ def ensure_x11vnc() -> None:
         print("[WARN] x11vnc not found — install manually: sudo apt install x11vnc")
 
 
+def _pcmanfm_desktop_confs() -> list[pathlib.Path]:
+    """Locate pcmanfm's per-profile desktop-items-0.conf file(s).
+
+    The profile directory name (e.g. "default", "LXDE-pi") varies by OS image,
+    so search for whatever is already there instead of assuming one.
+    """
+    base = pathlib.Path.home() / ".config" / "pcmanfm"
+    found = sorted(base.glob("*/desktop-items-0.conf")) if base.exists() else []
+    return found or [base / "default" / "desktop-items-0.conf"]
+
+
+def _set_ini_keys(path: pathlib.Path, updates: dict) -> None:
+    """Update (or append) flat key=value lines in an ini-style file, leaving everything else intact."""
+    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else ["[*]"]
+    seen = set()
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if "=" not in stripped or stripped.startswith(("#", "[")):
+            continue
+        key = stripped.split("=", 1)[0].strip()
+        if key in updates:
+            lines[i] = f"{key}={updates[key]}"
+            seen.add(key)
+    for key, value in updates.items():
+        if key not in seen:
+            lines.append(f"{key}={value}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def ensure_desktop_appearance() -> None:
+    """Set the kiosk wallpaper and hide desktop icons (Raspberry Pi only)."""
+    if not is_raspberry_pi():
+        return
+    wallpaper = DIR / "assets" / "wallpaper.png"
+    if not wallpaper.exists():
+        return
+
+    # Point pcmanfm's desktop folder at an empty directory so stray files a
+    # user drops on the real ~/Desktop never show up as icons.
+    empty_desktop = pathlib.Path.home() / ".config" / "autodash" / "empty-desktop"
+    empty_desktop.mkdir(parents=True, exist_ok=True)
+
+    updates = {
+        "wallpaper":      str(wallpaper),
+        "wallpaper_mode": "crop",
+        "show_home":      "0",
+        "show_trash":     "0",
+        "show_mounts":    "0",
+        "folder":         str(empty_desktop),
+    }
+    for conf in _pcmanfm_desktop_confs():
+        try:
+            _set_ini_keys(conf, updates)
+        except OSError as exc:
+            print(f"[WARN] Could not update {conf}: {exc}")
+            return
+
+    # Best-effort: apply immediately if pcmanfm's desktop manager is already
+    # running, so a reboot/relogin isn't required to see the change.
+    if shutil.which("pcmanfm"):
+        run("pcmanfm", "--reconfigure", check=False)
+
+
 def ensure_xmlstarlet() -> None:
     if shutil.which("xmlstarlet"):
         return
@@ -364,6 +428,7 @@ def main() -> None:
         ensure_xmlstarlet()
         ensure_openbox_config()
         ensure_openbox_no_decor()
+        ensure_desktop_appearance()
     venv_created  = ensure_venv()
     deps_updated  = install_deps(venv_created)
     install_playwright(deps_updated)
