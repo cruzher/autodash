@@ -30,9 +30,9 @@ RC_FILE     = OPENBOX_DIR / "rpd-rc.xml"
 RC_SYS      = pathlib.Path("/etc/xdg/openbox/rpd-rc.xml")
 RC_ASSET    = DIR / "assets" / "rpd-rc.xml"
 
-TERMINAL_HEIGHT       = 200  # px — height of the console strip
-TERMINAL_TOP_OFFSET   = 30   # px — shifted above the top edge to hide lxterminal's menu bar
-TERMINAL_WIDTH_EXTRA  = 10   # px — extra width hanging off the right edge to hide the scrollbar
+TERMINAL_HEIGHT       = 100  # px — height of the console strip
+TERMINAL_TOP_OFFSET   = 33   # px — shifted above the top edge to hide lxterminal's menu bar
+TERMINAL_WIDTH_EXTRA  = 15   # px — extra width hanging off the right edge to hide the scrollbar
 
 
 def banner(msg: str) -> None:
