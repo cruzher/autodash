@@ -92,7 +92,10 @@ def fix_wayland() -> None:
     print(" A reboot is required to apply the change.")
     print(" autodash will start automatically after reboot.")
     print()
-    input(" Press Enter to reboot now, or Ctrl+C to reboot later ...")
+    if sys.stdin.isatty():
+        input(" Press Enter to reboot now, or Ctrl+C to reboot later ...")
+    else:
+        print(" Rebooting automatically (no terminal attached) ...")
     run("sudo", "reboot", check=False)
     sys.exit(0)
 
