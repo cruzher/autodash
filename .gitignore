@@ -1,3 +1,11 @@
+# OS-specific files
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
 # Virtual environment
 .venv/
 
