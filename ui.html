@@ -13,8 +13,7 @@
   .sidebar { width: 220px; min-height: 100vh; background: #fff; border-right: 1px solid #e5e7eb;
              display: flex; flex-direction: column; flex-shrink: 0; position: sticky; top: 0; height: 100vh; }
   .sidebar-brand { padding: 20px 18px 16px; border-bottom: 1px solid #e5e7eb; }
-  .sidebar-brand img { height: 32px; display: block; }
-  .sidebar-brand p { font-size: 11px; color: #9ca3af; margin-top: 6px; }
+  .sidebar-brand img { width: 100%; height: auto; display: block; }
   .sidebar-footer { padding: 12px 10px; border-top: 1px solid #e5e7eb; margin-top: auto; }
   .signout-btn { display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 10px;
                  border: none; background: none; border-radius: 6px; font-size: 13px; font-weight: 500;
@@ -127,7 +126,6 @@
 <aside class="sidebar">
   <div class="sidebar-brand">
     <img src="/assets/Logo_light.png" alt="Autodash">
-    <p>Dashboard manager</p>
   </div>
   <nav class="sidebar-nav">
     <button class="nav-btn" :class="page === 'home' && 'active'" @click="page = 'home'; fetchScreenshot(); fetchMonitors()">
