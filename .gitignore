@@ -23,3 +23,6 @@ __pycache__/
 
 # Playwright browser binaries
 playwright/
+
+# Local docs/notes
+docs/
