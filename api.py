@@ -30,6 +30,7 @@ _SITES_JSON_PATH = Path(__file__).parent / "sites.json"
 _UI_HTML_PATH    = Path(__file__).parent / "ui.html"
 _LOGIN_HTML_PATH = Path(__file__).parent / "login.html"
 _LOG_PATH        = Path(__file__).parent / "logs" / "autodash.log"
+_ASSETS_PATH     = Path(__file__).parent / "assets"
 
 WEB_PORT = int(os.environ.get("WEB_PORT", 8080))
 
@@ -59,6 +60,10 @@ api = FastAPI(title="autodash config")
 if _NOVNC_PATH.exists():
     from fastapi.staticfiles import StaticFiles
     api.mount("/novnc-static", StaticFiles(directory=str(_NOVNC_PATH)), name="novnc")
+
+if _ASSETS_PATH.exists():
+    from fastapi.staticfiles import StaticFiles
+    api.mount("/assets", StaticFiles(directory=str(_ASSETS_PATH)), name="assets")
 
 
 @api.on_event("shutdown")
