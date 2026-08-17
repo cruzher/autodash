@@ -246,7 +246,7 @@ def ensure_desktop_appearance() -> None:
     """Set the kiosk wallpaper and hide desktop icons (Raspberry Pi only)."""
     if not is_raspberry_pi():
         return
-    wallpaper = DIR / "assets" / "wallpaper.png"
+    wallpaper = DIR / "assets" / "Logo_dark.png"
     if not wallpaper.exists():
         return
 
@@ -257,7 +257,8 @@ def ensure_desktop_appearance() -> None:
 
     updates = {
         "wallpaper":      str(wallpaper),
-        "wallpaper_mode": "crop",
+        "wallpaper_mode": "fit",
+        "desktop_bg":     "#020414",
         "show_home":      "0",
         "show_trash":     "0",
         "show_mounts":    "0",
