@@ -1,5 +1,12 @@
 # Changelog
 
+### 2026-08-17
+- **Autodash logo in the WebUI sidebar and login screen.** `ui.html` and `login.html` now show `assets/Logo_light.png` in place of the plain-text "Autodash" title, sized to fill most of the available width. The separate tagline text under it was dropped since the logo image already includes the wordmark and tagline. A new `/assets` static mount in `api.py` serves the image (and any other files under `assets/`) to the browser.
+
+### 2026-08-15
+- **Kiosk wallpaper and hidden desktop icons on Raspberry Pi.** `start.py` now sets `~/.config/pcmanfm/*/desktop-items-0.conf` to display `assets/Logo_dark.png` as the wallpaper (`wallpaper_mode=fit`) and hides desktop icons — disabling the home/trash/mounts icons and pointing pcmanfm's desktop folder at an empty directory, rather than relying on pcmanfm's own icon-visibility settings, which don't cover files a user later drops on the real Desktop folder.
+- **Terminal window pinned to a strip along the top of the screen on Raspberry Pi.** `start.py` now repositions the `lxterminal` window at startup using the same xdotool-based tools `display.py` uses to position the kiosk's Chromium windows (`find_window_by_class()` and `get_screen_size()` were added there for this). The new `ensure_terminal_position()` moves the window to `(0, -33)` and resizes it to `screen_width + 15` × `100`, shifted above the top edge to crop off lxterminal's menu bar and wider than the screen to push its scrollbar past the right edge.
+
 ### 2026-08-14
 - **Borderless kiosk windows on Raspberry Pi.** `start.py` now disables openbox window decorations globally, so a fresh Pi image no longer shows a titlebar on the kiosk Chromium window. It seeds `~/.config/openbox/rpd-rc.xml` from `/etc/xdg/openbox/rpd-rc.xml` (or a bundled fallback at `assets/rpd-rc.xml` if that's missing) and idempotently injects a `<decor>no</decor>` rule via `xmlstarlet`, then reloads openbox to apply it without a reboot. `xmlstarlet` is installed automatically.
 
