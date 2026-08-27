@@ -208,16 +208,7 @@
 
         <!-- Display card -->
         <div class="site-card">
-          <div class="card-header" style="cursor:default;">
-            <!-- Left: scheduler controls -->
-            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-              <button class="btn-secondary"
-                      :style="schedulerPaused ? 'background:#fff7ed;color:#ea580c;border-color:#fed7aa;' : ''"
-                      @click="toggleSchedulerPause()"
-                      :title="schedulerPaused ? 'Resume scheduled sites' : 'Pause scheduled sites'">
-                <span x-text="schedulerPaused ? '⏸ Paused' : '▶ Running'"></span>
-              </button>
-            </div>
+          <div class="card-header" style="cursor:default;justify-content:flex-end;">
             <!-- Right: updated timestamp + refresh + live status -->
             <div style="display:flex;align-items:center;gap:8px;">
               <template x-if="screenshotClickPos">
@@ -595,6 +586,12 @@ python autologin.py status</pre>
       <div class="topbar">
         <h2>Remote Control</h2>
         <div class="topbar-actions">
+          <button class="btn-secondary"
+                  :style="schedulerPaused ? 'background:#fff7ed;color:#ea580c;border-color:#fed7aa;' : ''"
+                  @click="toggleSchedulerPause()"
+                  :title="schedulerPaused ? 'Resume scheduled sites' : 'Pause scheduled sites'">
+            <span x-text="schedulerPaused ? '⏸ Paused' : '▶ Running'"></span>
+          </button>
           <template x-if="novncRunning">
             <button class="btn-secondary" @click="stopNovnc()">Stop</button>
           </template>
