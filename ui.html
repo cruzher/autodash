@@ -319,9 +319,7 @@
                 <div class="field"><label>Window Y</label><input type="number" x-model.number="site.window_y"></div>
                 <div class="field"><label>Width</label><input type="number" x-model.number="site.window_width"></div>
                 <div class="field"><label>Height</label><input type="number" x-model.number="site.window_height"></div>
-                <div class="field checkbox-row"><input type="checkbox" x-model="site.force_dark_mode" :id="'fd-'+si"><label :for="'fd-'+si">Force dark mode</label></div>
               </div>
-              <p class="hint" x-show="site.force_dark_mode" style="margin-top:8px;">Inverts the page's colors to fake a dark theme on dashboards with no dark mode of their own. Some pages may render oddly (inverted photos/logos). Takes effect after this window restarts.</p>
 
               <!-- Login -->
               <div class="section-title">Login</div>
@@ -699,7 +697,6 @@ function defaultSite() {
     window_y: 0,
     window_width: 1280,
     window_height: 900,
-    force_dark_mode: false,
     post_login_url: "",
     post_login_enabled: false,
     auto_login: true,

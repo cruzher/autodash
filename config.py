@@ -39,11 +39,6 @@ class SiteConfig:
     # Set to True to launch this window in fullscreen (kiosk-style)
     fullscreen: bool = False
 
-    # Force a synthetic dark theme via injected CSS, for dashboards with no
-    # native dark mode of their own. A blanket filter-invert trick, not a
-    # per-site theme - some pages may render oddly (inverted photos, etc).
-    force_dark_mode: bool = False
-
 
     # Optional: navigate to this URL after a successful login.
     # Leave empty to stay on whatever page the site lands on after login.

@@ -26,30 +26,6 @@ _OFFLINE_URL          = (Path(__file__).parent / "offline.html").as_uri()
 _NO_SCHEDULE_URL      = (Path(__file__).parent / "no_schedule.html").as_uri()
 _SITE_UNAVAILABLE_URL = (Path(__file__).parent / "site_unavailable.html").as_uri()
 
-# Blanket "invert everything, then invert media back" trick: gives pages with
-# no native dark theme a synthetic one. Applied as an init script so it's
-# re-injected before first paint on every navigation, including reloads.
-_DARK_MODE_CSS = """
-html {
-  filter: invert(1) hue-rotate(180deg) !important;
-  background: #fff !important;
-}
-img, video, picture, canvas, svg, iframe {
-  filter: invert(1) hue-rotate(180deg) !important;
-}
-"""
-
-_DARK_MODE_INIT_SCRIPT = """
-(() => {
-  // Skip autodash's own local notice pages (offline/unavailable/no-schedule),
-  // which already ship a dark theme of their own.
-  if (location.protocol === 'file:') return;
-  const style = document.createElement('style');
-  style.textContent = %s;
-  document.documentElement.appendChild(style);
-})();
-""" % json.dumps(_DARK_MODE_CSS)
-
 CHECK_INTERVAL_SECONDS  = 30
 RECONNECT_DELAY_SECONDS = 5
 POSITION_CHECK_SECONDS  = 10
@@ -151,9 +127,6 @@ class SiteMonitor:
 
         pages = self.context.pages
         self.page = pages[0] if pages else await self.context.new_page()
-
-        if self.cfg.force_dark_mode:
-            await self.page.add_init_script(_DARK_MODE_INIT_SCRIPT)
 
         await position_window(self.cfg, self.page)
 
