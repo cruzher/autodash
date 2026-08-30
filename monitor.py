@@ -29,7 +29,7 @@ from scheduler import is_scheduled_now
 from site_monitor import SiteMonitor
 
 
-_RESTART_FIELDS = frozenset({"url", "username", "password", "totp_secret", "fullscreen"})
+_RESTART_FIELDS = frozenset({"url", "username", "password", "totp_secret", "fullscreen", "force_dark_mode"})
 
 def _requires_restart(old_cfg, new_cfg) -> bool:
     return any(getattr(old_cfg, f) != getattr(new_cfg, f) for f in _RESTART_FIELDS)
