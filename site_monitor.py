@@ -143,6 +143,9 @@ class SiteMonitor:
             ignore_default_args = ["--enable-automation"],
             no_viewport         = True,
             ignore_https_errors = True,
+            # Many dashboards' CSP (style-src without 'unsafe-inline') would
+            # otherwise silently block the injected dark-mode <style> tag.
+            bypass_csp          = self.cfg.force_dark_mode,
             env                 = launch_env,
         )
 
