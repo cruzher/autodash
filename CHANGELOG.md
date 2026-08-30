@@ -2,7 +2,6 @@
 
 ### 2026-08-30
 - **Per-site "Force dark mode".** A new checkbox under **Window** in the site editor injects a CSS filter-invert stylesheet into that site's dashboard, giving it a synthetic dark theme even when the site has none of its own. Applied via `page.add_init_script()` in `site_monitor.py` so it's re-injected before first paint on every navigation, including reloads and post-login redirects; autodash's own offline/unavailable/no-schedule notice pages are excluded since they already ship a dark theme. Toggling it restarts that site's window, same as `fullscreen`.
-- **Fix: dark mode CSS silently blocked by dashboard CSP.** Dashboards that send a `Content-Security-Policy` header without `unsafe-inline` for `style-src` were silently dropping the injected `<style>` tag. The browser context is now launched with `bypass_csp=True` when `force_dark_mode` is enabled for that site.
 
 ### 2026-08-17
 - **Autodash logo in the WebUI sidebar and login screen.** `ui.html` and `login.html` now show `assets/Logo_light.png` in place of the plain-text "Autodash" title, sized to fill most of the available width. The separate tagline text under it was dropped since the logo image already includes the wordmark and tagline. A new `/assets` static mount in `api.py` serves the image (and any other files under `assets/`) to the browser.
